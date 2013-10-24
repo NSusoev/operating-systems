@@ -8,6 +8,9 @@
 #include <signal.h>
 #include <string.h>
 
+char *getfile_html_code(char *filepath);
+int check_file_on_exist();
+
 int main()
 {
   int server_sockfd, client_sockfd;
@@ -28,6 +31,10 @@ int main()
   while(1)
   {
     char msg[100];
+    char path[50], *ppath , *pmsg;
+    ppath = path;
+    pmsg = msg;
+
     printf("server waititng \n");
   
     client_len = sizeof(client_address);
@@ -35,8 +42,41 @@ int main()
     if (fork() == 0) {
         printf("connection is init\n");
         read(client_sockfd, msg, sizeof(msg));
-        sleep(5);
         printf("server get this:\n%s\n", msg);
+
+        if (strncmp("GET", msg, 3) == 0)
+        {
+          printf("this is GET query\n");
+          pmsg = pmsg + 5;
+
+          while(*pmsg != ' ')
+          {
+            *ppath++ = *pmsg++;
+          }
+          *ppath = 0;
+          printf("need file: %s\n", path);
+
+          if(check_file_on_exist(path) == 0)
+          {
+            printf("file is exists\n");
+            write(client_sockfd,"HTTP/1.1 200 OK\n",24);
+            write(client_sockfd,"Content-Type: text/html\n",23);
+            write(client_sockfd,"Content-Length: 48\n",23);
+            write(client_sockfd,"Connection: close\n\n",21);
+            write(client_sockfd,"<html><body><h1>HELLO WORLD!</h1></body></html>",48);
+
+          }
+          else
+          {
+            printf("file isn't exists\n");
+            write(client_sockfd,"HTTP/1.1 404 Not Found\n",24);
+            write(client_sockfd,"Content-Type: text/html\n",23);
+            write(client_sockfd,"Content-Length: 48\n",23);
+            write(client_sockfd,"Connection: close\n\n",21);
+            write(client_sockfd,"<html><body><h1>404 Not Found</h1></body></html>",48);
+          }
+        }
+
         close(client_sockfd);
         exit(EXIT_SUCCESS);
     }
@@ -45,3 +85,15 @@ int main()
     }
   }
 }
+
+int check_file_on_exist(char *filepath)
+{
+  FILE *fo;
+
+  fo = fopen(filepath,"r");
+  if (fo == NULL)
+  {
+    return 1;
+  }
+  return 0;
+}  
