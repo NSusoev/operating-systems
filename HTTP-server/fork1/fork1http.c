@@ -8,8 +8,22 @@
 #include <signal.h>
 #include <string.h>
 
+struct http_procotol
+{
+  char *header;
+  char *mime_type;
+  char *connection_stat;
+  char *data_length;
+  char *server;
+  char *body;
+};
+
 char *getfile_html_code(char *filepath);
-int check_file_on_exist();
+int check_file_on_exist(char *filepath);
+
+struct http_procotol server_answer;
+char *server_answer_msg;
+int server_answer_msg_len;
 
 int main()
 {
@@ -32,6 +46,8 @@ int main()
   {
     char msg[100];
     char path[50], *ppath , *pmsg;
+    int bytes;
+    int written_bytes;
     ppath = path;
     pmsg = msg;
 
@@ -59,24 +75,50 @@ int main()
           if(check_file_on_exist(path) == 0)
           {
             printf("file is exists\n");
-            write(client_sockfd,"HTTP/1.1 200 OK\n",24);
-            write(client_sockfd,"Content-Type: text/html\n",23);
-            write(client_sockfd,"Content-Length: 48\n",23);
-            write(client_sockfd,"Connection: close\n\n",21);
-            write(client_sockfd,"<html><body><h1>HELLO WORLD!</h1></body></html>",48);
+            server_answer.header = "HTTP/1.1 200 OK\n";
+            server_answer.server = "Server: localhost:6565\n";
+            server_answer.mime_type = "Content-Type: text/html; charset=utf-8\n";
+            server_answer.connection_stat = "Connection: close\n\n";
+            server_answer.body = getfile_html_code(path);
+            server_answer.data_length = "Content-Length: ";
+            strcat(server_answer.data_length,(char *)strlen(server_answer.body));
+            strcat(server_answer.data_length,"\n");
+            
+            strcat(server_answer_msg,server_answer.header);
+            strcat(server_answer_msg,server_answer.server);
+            strcat(server_answer_msg,server_answer.mime_type);
+            strcat(server_answer_msg,server_answer.data_length);
+            strcat(server_answer_msg,server_answer.connection_stat);
+            strcat(server_answer_msg,server_answer.body);
 
+            printf("%s\n",server_answer_msg);
+
+            server_answer_msg_len = strlen(server_answer_msg);
+
+            while(written_bytes < server_answer_msg_len)
+            {
+              bytes = write(client_sockfd, server_answer_msg, sizeof(char) * strlen(server_answer_msg));
+              if (bytes != strlen(server_answer_msg))
+              { 
+                server_answer_msg += bytes;
+              }
+              written_bytes += bytes;
+            }
           }
           else
           {
             printf("file isn't exists\n");
-            write(client_sockfd,"HTTP/1.1 404 Not Found\n",24);
-            write(client_sockfd,"Content-Type: text/html\n",23);
-            write(client_sockfd,"Content-Length: 48\n",23);
-            write(client_sockfd,"Connection: close\n\n",21);
-            write(client_sockfd,"<html><body><h1>404 Not Found</h1></body></html>",48);
+            server_answer.header = "HTTP/1.1 404 Not Found\n";
+            server_answer.mime_type = "Content-Type: text/html\n";
+            server_answer.connection_stat = "Connection: close\n\n";
+            server_answer.body = "<html><body><h1>404 Not Found</h1></body></html>";
+
+            write(client_sockfd, server_answer.header, sizeof(char) * strlen(server_answer.header));
+            write(client_sockfd, server_answer.mime_type, sizeof(char) * strlen(server_answer.mime_type));
+            write(client_sockfd, server_answer.connection_stat, sizeof(char) * strlen(server_answer.connection_stat));
+            write(client_sockfd, server_answer.body, sizeof(char) * strlen(server_answer.body));
           }
         }
-
         close(client_sockfd);
         exit(EXIT_SUCCESS);
     }
@@ -93,7 +135,20 @@ int check_file_on_exist(char *filepath)
   fo = fopen(filepath,"r");
   if (fo == NULL)
   {
+    fclose(fo);
     return 1;
   }
+  fclose(fo);
   return 0;
-}  
+} 
+
+char *getfile_html_code(char *filepath)
+{
+  FILE *fo;
+  char *body;
+
+  fo = fopen(filepath,"r");
+  fscanf(fo,"%s",body);
+  fclose(fo);
+  return body;
+} 
