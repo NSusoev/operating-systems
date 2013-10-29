@@ -6,7 +6,17 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <fcntl.h>
 #include <string.h>
+
+#define DEBUG
+#define PARTBUF_SIZE 1024
+
+#ifdef DEBUG
+#define TRACE printf("%s %d\n", __FILE__, __LINE__);
+#else
+#define TRACE
+#endif
 
 struct http_procotol
 {
@@ -22,8 +32,8 @@ char *getfile_html_code(char *filepath);
 int check_file_on_exist(char *filepath);
 
 struct http_procotol server_answer;
-char *server_answer_msg;
-int server_answer_msg_len;
+char msg[99999];
+char path[99999];
 
 int main()
 {
@@ -44,8 +54,7 @@ int main()
 
   while(1)
   {
-    char msg[100];
-    char path[50], *ppath , *pmsg;
+    char *ppath , *pmsg;
     int bytes;
     int written_bytes;
     ppath = path;
@@ -57,7 +66,10 @@ int main()
     client_sockfd = accept(server_sockfd,(struct sockaddr *)&client_address,&client_len);
     if (fork() == 0) {
         printf("connection is init\n");
+        memset((void *)msg,(int)'\0',99999);
+        TRACE
         read(client_sockfd, msg, sizeof(msg));
+        TRACE
         printf("server get this:\n%s\n", msg);
 
         if (strncmp("GET", msg, 3) == 0)
@@ -74,40 +86,31 @@ int main()
 
           if(check_file_on_exist(path) == 0)
           {
-            printf("file is exists\n");
+            printf("file exists\n");
+            TRACE
             server_answer.header = "HTTP/1.1 200 OK\n";
-            server_answer.server = "Server: localhost:6565\n";
+            server_answer.server = "Host: localhost:6565\n";
             server_answer.mime_type = "Content-Type: text/html; charset=utf-8\n";
             server_answer.connection_stat = "Connection: close\n\n";
+            TRACE
             server_answer.body = getfile_html_code(path);
-            server_answer.data_length = "Content-Length: ";
-            strcat(server_answer.data_length,(char *)strlen(server_answer.body));
-            strcat(server_answer.data_length,"\n");
-            
-            strcat(server_answer_msg,server_answer.header);
-            strcat(server_answer_msg,server_answer.server);
-            strcat(server_answer_msg,server_answer.mime_type);
-            strcat(server_answer_msg,server_answer.data_length);
-            strcat(server_answer_msg,server_answer.connection_stat);
-            strcat(server_answer_msg,server_answer.body);
+            printf("html: %s\n",server_answer.body);
 
-            printf("%s\n",server_answer_msg);
+            send(client_sockfd, server_answer.header, strlen(server_answer.header), 0);
+            send(client_sockfd, server_answer.server, strlen(server_answer.server), 0);
+            send(client_sockfd, server_answer.mime_type, strlen(server_answer.mime_type), 0);
+            send(client_sockfd, server_answer.connection_stat, strlen(server_answer.connection_stat), 0);
 
-            server_answer_msg_len = strlen(server_answer_msg);
-
-            while(written_bytes < server_answer_msg_len)
+            written_bytes = 0;
+            while(written_bytes < strlen(server_answer.body))
             {
-              bytes = write(client_sockfd, server_answer_msg, sizeof(char) * strlen(server_answer_msg));
-              if (bytes != strlen(server_answer_msg))
-              { 
-                server_answer_msg += bytes;
-              }
+              bytes = write(client_sockfd, server_answer.body, strlen(server_answer.body));
               written_bytes += bytes;
             }
           }
           else
           {
-            printf("file isn't exists\n");
+            printf("file not exists\n");
             server_answer.header = "HTTP/1.1 404 Not Found\n";
             server_answer.mime_type = "Content-Type: text/html\n";
             server_answer.connection_stat = "Connection: close\n\n";
@@ -135,7 +138,6 @@ int check_file_on_exist(char *filepath)
   fo = fopen(filepath,"r");
   if (fo == NULL)
   {
-    fclose(fo);
     return 1;
   }
   fclose(fo);
@@ -148,7 +150,8 @@ char *getfile_html_code(char *filepath)
   char *body;
 
   fo = fopen(filepath,"r");
-  fscanf(fo,"%s",body);
+  fread(body,PARTBUF_SIZE,1,fo);
+       
   fclose(fo);
   return body;
 } 
