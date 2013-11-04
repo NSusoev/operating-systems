@@ -4,5 +4,5 @@
 fork1http
 *.png
 *.jpg
-/img
+*.pdf
 
