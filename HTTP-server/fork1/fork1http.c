@@ -11,6 +11,7 @@
 
 #define DEBUG
 #define PARTBUF_SIZE 1024
+#define PATH "/home/susoev/Документы/Operating-systems/HTTP-server/fork1"
 
 #ifdef DEBUG
 #define TRACE printf("%s %d\n", __FILE__, __LINE__);
@@ -28,12 +29,11 @@ struct http_procotol
   char *body;
 };
 
-char *getfile_html_code(char *filepath);
-int check_file_on_exist(char *filepath);
-
 struct http_procotol server_answer;
 char msg[99999];
 char path[99999];
+char html[PARTBUF_SIZE];
+char *ROOT, *req_params[2];
 
 int main()
 {
@@ -55,8 +55,7 @@ int main()
   while(1)
   {
     char *ppath , *pmsg;
-    int bytes;
-    int written_bytes;
+    int bytes, fd;
     ppath = path;
     pmsg = msg;
 
@@ -66,92 +65,52 @@ int main()
     client_sockfd = accept(server_sockfd,(struct sockaddr *)&client_address,&client_len);
     if (fork() == 0) {
         printf("connection is init\n");
+        ROOT = PATH;
+        printf("SERVER_PATH: %s\n", ROOT);
+
         memset((void *)msg,(int)'\0',99999);
-        TRACE
         read(client_sockfd, msg, sizeof(msg));
-        TRACE
         printf("server get this:\n%s\n", msg);
 
-        if (strncmp("GET", msg, 3) == 0)
+        req_params[0] = strtok(msg, " \t\n");
+        if (strncmp(req_params[0], "GET\0", 4) == 0)
         {
           printf("this is GET query\n");
-          pmsg = pmsg + 5;
+          req_params[1] = strtok(NULL," \t");
 
-          while(*pmsg != ' ')
+          if (strncmp(req_params[1],"/\0",2) == 0)
+            req_params[1] = "/index.html";
+
+          printf("need file: %s\n", req_params[1]);
+          strcpy(path,ROOT);
+          strcpy(&path[strlen(ROOT)], req_params[1]);
+          printf("FILE_PATH: %s\n", path);
+
+          if ((fd = open(path, O_RDONLY)) != -1)
           {
-            *ppath++ = *pmsg++;
-          }
-          *ppath = 0;
-          printf("need file: %s\n", path);
-
-          if(check_file_on_exist(path) == 0)
-          {
-            printf("file exists\n");
-            TRACE
-            server_answer.header = "HTTP/1.1 200 OK\n";
-            server_answer.server = "Host: localhost:6565\n";
-            server_answer.mime_type = "Content-Type: text/html; charset=utf-8\n";
-            server_answer.connection_stat = "Connection: close\n\n";
-            TRACE
-            server_answer.body = getfile_html_code(path);
-            printf("html: %s\n",server_answer.body);
-
+            server_answer.header = "HTTP/1.1 200 OK\n\n";
             send(client_sockfd, server_answer.header, strlen(server_answer.header), 0);
-            send(client_sockfd, server_answer.server, strlen(server_answer.server), 0);
-            send(client_sockfd, server_answer.mime_type, strlen(server_answer.mime_type), 0);
-            send(client_sockfd, server_answer.connection_stat, strlen(server_answer.connection_stat), 0);
-
-            written_bytes = 0;
-            while(written_bytes < strlen(server_answer.body))
+            TRACE
+            while((bytes = read(fd, html, PARTBUF_SIZE)) > 0)
             {
-              bytes = write(client_sockfd, server_answer.body, strlen(server_answer.body));
-              written_bytes += bytes;
+              write(client_sockfd, html, bytes);
             }
+            close(fd);
           }
           else
           {
-            printf("file not exists\n");
-            server_answer.header = "HTTP/1.1 404 Not Found\n";
-            server_answer.mime_type = "Content-Type: text/html\n";
-            server_answer.connection_stat = "Connection: close\n\n";
+            server_answer.header = "HTTP/1.1 404 Not Found\n\n";
             server_answer.body = "<html><body><h1>404 Not Found</h1></body></html>";
-
-            write(client_sockfd, server_answer.header, sizeof(char) * strlen(server_answer.header));
-            write(client_sockfd, server_answer.mime_type, sizeof(char) * strlen(server_answer.mime_type));
-            write(client_sockfd, server_answer.connection_stat, sizeof(char) * strlen(server_answer.connection_stat));
-            write(client_sockfd, server_answer.body, sizeof(char) * strlen(server_answer.body));
+            send(client_sockfd, server_answer.header, strlen(server_answer.header), 0);
+            send(client_sockfd, server_answer.body, strlen(server_answer.body), 0);
           }
+
+          close(client_sockfd);
+          exit(EXIT_SUCCESS);
         }
-        close(client_sockfd);
-        exit(EXIT_SUCCESS);
     }
     else {
        close(client_sockfd);
     }
   }
-}
-
-int check_file_on_exist(char *filepath)
-{
-  FILE *fo;
-
-  fo = fopen(filepath,"r");
-  if (fo == NULL)
-  {
-    return 1;
-  }
-  fclose(fo);
-  return 0;
-} 
-
-char *getfile_html_code(char *filepath)
-{
-  FILE *fo;
-  char *body;
-
-  fo = fopen(filepath,"r");
-  fread(body,PARTBUF_SIZE,1,fo);
-       
-  fclose(fo);
-  return body;
 } 
