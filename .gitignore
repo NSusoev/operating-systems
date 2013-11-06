@@ -2,6 +2,7 @@
 *.o
 *.html
 fork1http
+server
 *.png
 *.jpg
 *.pdf
