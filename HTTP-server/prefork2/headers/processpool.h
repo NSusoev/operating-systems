@@ -4,7 +4,7 @@
 typedef struct entry_t
 {
   sem_t *entry_semaphore;
-  int proc_pid;
+  pid_t proc_pid;
   struct entry_t *next;
 } entry_t;
 
