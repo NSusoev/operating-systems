@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <semaphore.h>
+#include <sys/shm.h>
 #include "headers/processpool.h"
 #include "headers/debug.h"
 
@@ -12,7 +13,7 @@ static queue_t proc_queue;
 extern void add_in_tail(queue_t *proc_queue, entry_t *newproc)
 {
     proc_queue->count++;
-    printf("add free proc in tail,count = %d\n",proc_queue->count);
+    printf("adding free proc in tail,count = %d\n",proc_queue->count);
 
     if(proc_queue->head == NULL)
     {
@@ -25,6 +26,9 @@ extern void add_in_tail(queue_t *proc_queue, entry_t *newproc)
         proc_queue->tail = newproc;
         proc_queue->tail->next = NULL;
     }
+
+    if(proc_queue->head != NULL)
+        printf("HEAD NOT NULL!\n");
 }
 
 extern entry_t *pop_free_proc(queue_t *proc_queue)

@@ -6,4 +6,4 @@ server
 *.png
 *.jpg
 *.pdf
-
+*.c.swp
