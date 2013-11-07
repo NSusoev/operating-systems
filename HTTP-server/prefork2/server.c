@@ -10,10 +10,9 @@
 #include <fcntl.h>
 #include <string.h>
 #include <signal.h>
+#include "headers/answer.h"
 
-//#define DEBUG
-#define PARTBUF_SIZE 1024
-#define PATH "/home/susoev/Документы/Operating-systems/HTTP-server/prefork2"
+#define DEBUG
 #define POOL_SIZE 10
 
 #ifdef DEBUG
@@ -22,22 +21,9 @@
 #define TRACE
 #endif
 
-typedef struct http_procotol_t
-{
-  char *header;
-  char *body;
-} http_protocol_t;
-
-char msg[99999];
-char path[99999];
-char html[PARTBUF_SIZE];
-struct http_procotol_t server_answer;
-
-char *ROOT, *req_params[2];
-
 int main()
 {
-    int i, fork_result, bytes, fd;
+    int i, fork_result;
     int server_sockfd, client_sockfd;
     int server_len, client_len;
     struct sockaddr_in server_address;
@@ -61,43 +47,10 @@ int main()
                 printf("child %d waiting...\n", getpid());
                 client_len = sizeof(client_address);
                 client_sockfd = accept(server_sockfd, (struct sockaddr *)&client_address, &client_len);
+
                 printf("client connected to child process %d\n", getpid());
-
-                ROOT = PATH;
-                memset((void *)msg,(int)'\0',99999);
-                read(client_sockfd, msg, sizeof(msg));
-
-                req_params[0] = strtok(msg," ");
-                if(strncmp(req_params[0], "GET\0", 4) == 0)
-                {
-                    req_params[1] = strtok(NULL," ");
-
-                    if(strncmp(req_params[1],"/\0",2) == 0)
-                        req_params[1] = "/index.html";
-
-                    strcpy(path,ROOT);
-                    strcpy(&path[strlen(ROOT)],req_params[1]);
-
-                    if ((fd = open(path, O_RDONLY)) != -1)
-                    {
-                      server_answer.header = "HTTP/1.1 200 OK\n\n";
-                      send(client_sockfd, server_answer.header, strlen(server_answer.header), 0);
-                      TRACE
-                      while((bytes = read(fd, html, PARTBUF_SIZE)) > 0)
-                      {
-                        write(client_sockfd, html, bytes);
-                      }
-                      close(fd);
-                    }
-                    else
-                    {
-                      server_answer.header = "HTTP/1.1 404 Not Found\n\n";
-                      server_answer.body = "<html><body><h1>404 Not Found</h1></body></html>";
-                      send(client_sockfd, server_answer.header, strlen(server_answer.header), 0);
-                      send(client_sockfd, server_answer.body, strlen(server_answer.body), 0);
-                    }
-                    close(client_sockfd);
-                }
+                answer(client_sockfd);
+                close(client_sockfd);
             }
         }
 
