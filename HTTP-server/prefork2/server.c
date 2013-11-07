@@ -3,189 +3,105 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include <semaphore.h>
-#include <sys/shm.h>
-#include "headers/processpool.h"
-#include "headers/debug.h"
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/ioctl.h>
+#include <fcntl.h>
+#include <string.h>
+#include <signal.h>
 
-#define DEBUG
+//#define DEBUG
+#define PARTBUF_SIZE 1024
+#define PATH "/home/susoev/Документы/Operating-systems/HTTP-server/prefork2"
+#define POOL_SIZE 10
 
-typedef struct shared_use
+#ifdef DEBUG
+#define TRACE printf("%s %d\n", __FILE__,__LINE__);
+#else
+#define TRACE
+#endif
+
+typedef struct http_procotol_t
 {
-    sem_t sems[10];
-    proc_pool_t pool;
-    entry_t procesess[10];
+  char *header;
+  char *body;
+} http_protocol_t;
 
-} shared_use;
+char msg[99999];
+char path[99999];
+char html[PARTBUF_SIZE];
+struct http_procotol_t server_answer;
 
-void queue_test();
-
-entry_t proc;
-pid_t fork_result;
-entry_t *centry;
+char *ROOT, *req_params[2];
 
 int main()
 {
-    void *shared_memory = (void *)0;
-    shared_use *shared_stuff;
-    int shmid, res , i;
+    int i, fork_result, bytes, fd;
+    int server_sockfd, client_sockfd;
+    int server_len, client_len;
+    struct sockaddr_in server_address;
+    struct sockaddr_in client_address;
 
-    shmid = shmget((key_t)123, sizeof(shared_use), 0666 | IPC_CREAT);
-    if(shmid == -1)
-    {
-        fprintf(stderr,"shmget failed\n");
-        exit(EXIT_FAILURE);
-    }
+    server_sockfd = socket(AF_INET,SOCK_STREAM,0);
+    server_address.sin_family = AF_INET;
+    server_address.sin_addr.s_addr = inet_addr("127.0.0.1");
+    server_address.sin_port = htons(6565);
+    server_len = sizeof(server_address);
+    bind(server_sockfd,(struct sockaddr *)&server_address, server_len);
 
-    shared_memory = shmat(shmid, (void *)0, 0);
-    if(shared_memory == (void *)-1)
-    {
-        fprintf(stderr, "shmat failed\n");
-        exit(EXIT_FAILURE);
-    }
+    listen(server_sockfd, 5);
+    signal(SIGCHLD,SIG_IGN);
 
-    shared_stuff = (shared_use *)shared_memory;
-
-    for(i; i < 10; i++)
-    {
-        res = sem_init(&shared_stuff->sems[i],1,0);
-        if(res != 0)
+    for(i = 0; i < POOL_SIZE; i++)
+        if((fork_result = fork()) == 0)
         {
-            perror("Semaphore init failed");
-            exit(EXIT_FAILURE);
-        }
-    }
-    printf("sems init ok\n");
-    fflush(stdout);
-    shared_stuff->pool = get_pool();
-    fflush(stdout);
-
-    i = 0;
-    for(i; i < 1; i++);
-    {
-        fork_result = fork();
-        if(fork_result == -1)
-        {
-            fprintf(stderr,"Fork failure\n");
-            exit(EXIT_FAILURE);
-        }
-
-        if(fork_result == 0)
-        {
-            shmid = shmget((key_t)123, sizeof(shared_use), 0666 | IPC_CREAT);
-            if(shmid == -1)
-            {
-                fprintf(stderr,"shmget failed\n");
-                exit(EXIT_FAILURE);
-            }
-
-            shared_memory = shmat(shmid, (void *)0, 0);
-            if(shared_memory == (void *)-1)
-            {
-                fprintf(stderr, "shmat failed\n");
-                exit(EXIT_FAILURE);
-            }
-
-            shared_stuff = (shared_use *)shared_memory;
-            printf("child add shm ok\n");
-            fflush(stdout);
-
-            shared_stuff->procesess[i].entry_semaphore = &shared_stuff->sems[i];
-            shared_stuff->procesess[i].proc_pid = getpid();
-
-            printf("child proc init ok\n");
-            fflush(stdout);
-
-            add_in_tail(shared_stuff->pool.proc_queue, &shared_stuff->procesess[i]);
-            printf("child proc add in queue ok\n");
-            sem_post(&shared_stuff->sems[0]);
-
             while(1)
             {
-                ;
+                printf("child %d waiting...\n", getpid());
+                client_len = sizeof(client_address);
+                client_sockfd = accept(server_sockfd, (struct sockaddr *)&client_address, &client_len);
+                printf("client connected to child process %d\n", getpid());
+
+                ROOT = PATH;
+                memset((void *)msg,(int)'\0',99999);
+                read(client_sockfd, msg, sizeof(msg));
+
+                req_params[0] = strtok(msg," ");
+                if(strncmp(req_params[0], "GET\0", 4) == 0)
+                {
+                    req_params[1] = strtok(NULL," ");
+
+                    if(strncmp(req_params[1],"/\0",2) == 0)
+                        req_params[1] = "/index.html";
+
+                    strcpy(path,ROOT);
+                    strcpy(&path[strlen(ROOT)],req_params[1]);
+
+                    if ((fd = open(path, O_RDONLY)) != -1)
+                    {
+                      server_answer.header = "HTTP/1.1 200 OK\n\n";
+                      send(client_sockfd, server_answer.header, strlen(server_answer.header), 0);
+                      TRACE
+                      while((bytes = read(fd, html, PARTBUF_SIZE)) > 0)
+                      {
+                        write(client_sockfd, html, bytes);
+                      }
+                      close(fd);
+                    }
+                    else
+                    {
+                      server_answer.header = "HTTP/1.1 404 Not Found\n\n";
+                      server_answer.body = "<html><body><h1>404 Not Found</h1></body></html>";
+                      send(client_sockfd, server_answer.header, strlen(server_answer.header), 0);
+                      send(client_sockfd, server_answer.body, strlen(server_answer.body), 0);
+                    }
+                    close(client_sockfd);
+                }
             }
         }
-        else
-        {
-            printf("child created!\n");
-        }
 
-    }
-
-    fflush(stdout);
-    sem_wait(&shared_stuff->sems[0]);
-
-    centry = shared_stuff->pool.proc_queue->head;
-
-    if(centry == NULL)
-        printf("curentry == NULL\n");
-
-    while(centry != NULL)
-    {
-        printf("free proc pid = %d\n", centry->proc_pid);
-        centry = centry->next;
-    }
-
-    fflush(stdout);
-    if(shmdt(shared_memory) == -1)
-    {
-        fprintf(stderr,"shmdt failed\n");
-        exit(EXIT_FAILURE);
-    }
-
-    fflush(stdout);
-    if(shmctl(shmid,IPC_RMID,0) == -1)
-    {
-        fprintf(stderr,"shmctl(IPC_RMID) failed\n");
-        exit(EXIT_FAILURE);
-    }
-
-    return EXIT_SUCCESS;
+    wait(NULL);
 }
 
-void queue_test()
-{
-    int i = 0;
-    proc_pool_t mypool = get_pool();
-    entry_t *pop_entry1, *pop_entry2;
-    entry_t *curentry;
-
-    for(i; i < 10; i++)
-    {
-        entry_t *entry = (entry_t *)malloc(sizeof(entry_t));
-        entry->proc_pid = (pid_t)i;
-        add_in_tail(mypool.proc_queue, entry);
-    }
-    TRACE
-    pop_entry1 = pop_free_proc(mypool.proc_queue);
-    pop_entry2 = pop_free_proc(mypool.proc_queue);
-    TRACE
-    printf("work pid = %d\n",pop_entry1->proc_pid);
-    printf("work pid = %d\n",pop_entry2->proc_pid);
-    printf("\n");
-
-    curentry = mypool.proc_queue->head;
-    while(curentry != NULL)
-    {
-        printf("free pid = %d\n", curentry->proc_pid);
-        curentry = curentry->next;
-    }
-
-    printf("\n");
-    TRACE
-    add_in_tail(mypool.proc_queue,pop_entry1);
-    add_in_tail(mypool.proc_queue,pop_entry2);
-    TRACE
-    curentry = mypool.proc_queue->head;
-
-    while(curentry != NULL)
-    {
-        printf("free pid = %d\n", curentry->proc_pid);
-        curentry = curentry->next;
-    }
-
-    printf("\n");
-    printf("count = %d\n",mypool.proc_queue->count);
-
-}
 
