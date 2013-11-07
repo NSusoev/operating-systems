@@ -14,6 +14,7 @@ typedef struct shared_use
 {
     sem_t sems[10];
     proc_pool_t pool;
+    entry_t procesess[10];
 
 } shared_use;
 
@@ -28,7 +29,6 @@ int main()
     void *shared_memory = (void *)0;
     shared_use *shared_stuff;
     int shmid, res , i;
-    TRACE
 
     shmid = shmget((key_t)123, sizeof(shared_use), 0666 | IPC_CREAT);
     if(shmid == -1)
@@ -58,7 +58,6 @@ int main()
     printf("sems init ok\n");
     fflush(stdout);
     shared_stuff->pool = get_pool();
-    printf("59\n");
     fflush(stdout);
 
     i = 0;
@@ -91,14 +90,13 @@ int main()
             printf("child add shm ok\n");
             fflush(stdout);
 
-            proc.entry_semaphore = &shared_stuff->sems[i];
-            proc.proc_pid = getpid();
+            shared_stuff->procesess[i].entry_semaphore = &shared_stuff->sems[i];
+            shared_stuff->procesess[i].proc_pid = getpid();
 
             printf("child proc init ok\n");
             fflush(stdout);
 
-            add_in_tail(shared_stuff->pool.proc_queue, &proc);
-            shared_stuff->pool.proc_queue->head = &proc;
+            add_in_tail(shared_stuff->pool.proc_queue, &shared_stuff->procesess[i]);
             printf("child proc add in queue ok\n");
             sem_post(&shared_stuff->sems[0]);
 
@@ -114,11 +112,13 @@ int main()
 
     }
 
-    printf("116\n");
     fflush(stdout);
     sem_wait(&shared_stuff->sems[0]);
 
     centry = shared_stuff->pool.proc_queue->head;
+
+    if(centry == NULL)
+        printf("curentry == NULL\n");
 
     while(centry != NULL)
     {
@@ -126,10 +126,6 @@ int main()
         centry = centry->next;
     }
 
-    if(centry == NULL)
-        printf("curentry == NULL\n");
-
-    printf("119\n");
     fflush(stdout);
     if(shmdt(shared_memory) == -1)
     {
@@ -137,7 +133,6 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    printf("127\n");
     fflush(stdout);
     if(shmctl(shmid,IPC_RMID,0) == -1)
     {
