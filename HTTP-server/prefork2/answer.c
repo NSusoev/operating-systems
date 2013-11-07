@@ -17,7 +17,7 @@
 static char msg[99999];
 static char path[99999];
 static char html[PARTBUF_SIZE];
-static struct http_protocol_t server_answer;
+static http_protocol_t server_answer;
 static char *ROOT, *req_params[2];
 
 extern void answer(int client_sockfd)
