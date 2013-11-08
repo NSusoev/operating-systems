@@ -14,11 +14,11 @@
 #define PARTBUF_SIZE 1024
 #define PATH "/home/susoev/Документы/Operating-systems/HTTP-server/prefork2"
 
-static char msg[99999];
-static char path[99999];
-static char html[PARTBUF_SIZE];
+static char            msg[99999];
+static char            path[99999];
+static char            html[PARTBUF_SIZE];
 static http_protocol_t server_answer;
-static char *ROOT, *req_params[2];
+static char            *ROOT, *req_params[2];
 
 extern void answer(int client_sockfd)
 {
@@ -29,11 +29,11 @@ extern void answer(int client_sockfd)
     read(client_sockfd, msg, sizeof(msg));
 
     req_params[0] = strtok(msg," ");
-    if(strncmp(req_params[0], "GET\0", 4) == 0)
+    if(strncmp(req_params[0], "GET", 4) == 0)
     {
         req_params[1] = strtok(NULL," ");
 
-        if(strncmp(req_params[1],"/\0",2) == 0)
+        if(strncmp(req_params[1],"/", 2) == 0)
             req_params[1] = "/index.html";
 
         strcpy(path,ROOT);
