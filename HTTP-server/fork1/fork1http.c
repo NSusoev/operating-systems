@@ -7,10 +7,12 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <fcntl.h>
+#include <sys/shm.h>
 #include <string.h>
 
 #define DEBUG
 #define PARTBUF_SIZE 1024
+#define CLIENT_LIMIT 10
 #define PATH "/home/susoev/Документы/Operating-systems/HTTP-server/fork1"
 
 #ifdef DEBUG
@@ -22,25 +24,53 @@
 struct http_procotol
 {
   char *header;
-  char *mime_type;
-  char *connection_stat;
-  char *data_length;
-  char *server;
   char *body;
 };
 
+typedef struct c_client
+{
+    int curcount;
+} c_client;
+
 struct http_procotol server_answer;
-char msg[99999];
-char path[99999];
-char html[PARTBUF_SIZE];
-char *ROOT, *req_params[2];
+char   msg[99999];
+char   path[99999];
+char   html[PARTBUF_SIZE];
+char   *ROOT, *req_params[2];
+void   *shared_memory = (void *)0;
+int    shmid;
+
+void close_server(int sig);
 
 int main()
 {
-  int server_sockfd, client_sockfd;
-  int server_len, client_len;
-  struct sockaddr_in server_address;
-  struct sockaddr_in client_address;
+  int      server_sockfd, client_sockfd;
+  int      server_len, client_len;
+  struct   sockaddr_in server_address;
+  struct   sockaddr_in client_address;
+  struct   sigaction act;
+  c_client *shared_limit;
+
+  act.sa_handler = close_server;
+  sigemptyset(&act.sa_mask);
+  act.sa_flags = 0;
+  sigaction(SIGINT, &act, 0);
+
+  shmid = shmget((key_t)123,sizeof(c_client),0666 | IPC_CREAT);
+  if (shmid == -1)
+  {
+      fprintf(stderr,"shmget failed\n");
+      exit(EXIT_FAILURE);
+  }
+
+  shared_memory = shmat(shmid,(void *)0,0);
+  if (shared_memory == (void *)-1)
+  {
+      fprintf(stderr,"shmat failed\n");
+      exit(EXIT_FAILURE);
+  }
+
+  shared_limit = (c_client *)shared_memory;
 
   server_sockfd = socket(AF_INET,SOCK_STREAM,0);
   server_address.sin_family = AF_INET;
@@ -60,57 +90,88 @@ int main()
     pmsg = msg;
 
     printf("server waititng \n");
-  
     client_len = sizeof(client_address);
     client_sockfd = accept(server_sockfd,(struct sockaddr *)&client_address,&client_len);
-    if (fork() == 0) {
-        printf("connection is init\n");
-        ROOT = PATH;
-        printf("SERVER_PATH: %s\n", ROOT);
 
-        memset((void *)msg,(int)'\0',99999);
-        read(client_sockfd, msg, sizeof(msg));
-        printf("server get this:\n%s\n", msg);
-
-        req_params[0] = strtok(msg, " \t\n");
-        if (strncmp(req_params[0], "GET\0", 4) == 0)
+    if(shared_limit->curcount >= CLIENT_LIMIT)
+    {
+        printf("============server clients limit is exceeded! socket will be closed=============\n");
+        close(client_sockfd);
+    }
+    else
+        if (fork() == 0)
         {
-          printf("this is GET query\n");
-          req_params[1] = strtok(NULL," \t");
+            shared_limit->curcount++;
+            printf("clients count = %d\n", shared_limit->curcount);
+            printf("connection is init\n");
+            ROOT = PATH;
+            printf("SERVER_PATH: %s\n", ROOT);
 
-          if (strncmp(req_params[1],"/\0",2) == 0)
-            req_params[1] = "/index.html";
+            memset((void *)msg,(int)'\0',99999);
+            read(client_sockfd, msg, sizeof(msg));
+            printf("server get this:\n%s\n", msg);
 
-          printf("need file: %s\n", req_params[1]);
-          strcpy(path,ROOT);
-          strcpy(&path[strlen(ROOT)], req_params[1]);
-          printf("FILE_PATH: %s\n", path);
-
-          if ((fd = open(path, O_RDONLY)) != -1)
-          {
-            server_answer.header = "HTTP/1.1 200 OK\n\n";
-            send(client_sockfd, server_answer.header, strlen(server_answer.header), 0);
-            TRACE
-            while((bytes = read(fd, html, PARTBUF_SIZE)) > 0)
+            req_params[0] = strtok(msg, " ");
+            if (strncmp(req_params[0], "GET", 4) == 0)
             {
-              write(client_sockfd, html, bytes);
-            }
-            close(fd);
-          }
-          else
-          {
-            server_answer.header = "HTTP/1.1 404 Not Found\n\n";
-            server_answer.body = "<html><body><h1>404 Not Found</h1></body></html>";
-            send(client_sockfd, server_answer.header, strlen(server_answer.header), 0);
-            send(client_sockfd, server_answer.body, strlen(server_answer.body), 0);
-          }
+                printf("this is GET query\n");
+                req_params[1] = strtok(NULL," ");
 
-          close(client_sockfd);
-          exit(EXIT_SUCCESS);
+                if (strncmp(req_params[1],"/", 2) == 0)
+                    req_params[1] = "/index.html";
+
+                printf("need file: %s\n", req_params[1]);
+                strcpy(path,ROOT);
+                strcpy(&path[strlen(ROOT)], req_params[1]);
+                printf("FILE_PATH: %s\n", path);
+
+                if ((fd = open(path, O_RDONLY)) != -1)
+                {
+                    server_answer.header = "HTTP/1.1 200 OK\n\n";
+                    send(client_sockfd, server_answer.header, strlen(server_answer.header), 0);
+
+                    while((bytes = read(fd, html, PARTBUF_SIZE)) > 0)
+                    {
+                        write(client_sockfd, html, bytes);
+                    }
+                    close(fd);
+                }
+                else
+                {
+                    server_answer.header = "HTTP/1.1 404 Not Found\n\n";
+                    server_answer.body = "<html><body><h1>404 Not Found</h1></body></html>";
+                    send(client_sockfd, server_answer.header, strlen(server_answer.header), 0);
+                    send(client_sockfd, server_answer.body, strlen(server_answer.body), 0);
+                }
+
+                close(client_sockfd);
+                shared_limit->curcount--;
+                printf("clients count = %d\n", shared_limit->curcount);
+                exit(EXIT_SUCCESS);
+            }
         }
-    }
-    else {
-       close(client_sockfd);
-    }
+        else
+        {
+            close(client_sockfd);
+        }
   }
 } 
+
+void close_server(int sig)
+{
+    printf("server closing...\n");
+
+    if(shmdt(shared_memory) == -1)
+    {
+        fprintf(stderr,"shmdt failed\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if(shmctl(shmid,IPC_RMID,0) == -1)
+    {
+        fprintf(stderr,"shmctl(IPC_RMID) failed\n");
+        exit(EXIT_FAILURE);
+    }
+
+    exit(EXIT_SUCCESS);
+}
