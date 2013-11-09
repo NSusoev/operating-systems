@@ -12,7 +12,7 @@
 
 #define PARTBUF_SIZE 1024
 #define BEBUG
-#define PATH "/home/susoev/Документы/Operating-systems/HTTP-server/fork1"
+#define PATH "/home/susoev/Документы/Operating-systems/HTTP-server/non-blocking-io"
 #define TRUE  1
 #define FALSE 0
 
@@ -36,7 +36,7 @@ char   *ROOT, *req_params[2];
 
 int main(int argc, char *argv[])
 {
-    int    fd, file_fd, len, result, on = 1;
+    int    fd, file_fd, len, result, on = 1 , bytes;
     int    server_sockfd, client_sockfd;
     int    desc_ready, end_server = FALSE;
     int    server_len, client_len;
@@ -48,7 +48,6 @@ int main(int argc, char *argv[])
     fd_set             master_set, working_set;
 
     memset((void *)msg,(int)'\0',99999);
-
 
     server_sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if(server_sockfd < 0)
@@ -114,7 +113,7 @@ int main(int argc, char *argv[])
 
         desc_ready = result;
 
-        for(fd = 0; fd <= FD_SETSIZE && desc_ready > 0; ++fd)
+        for(fd = 0; fd <= FD_SETSIZE && desc_ready > 0; fd++)
         {
             if(FD_ISSET(fd, &working_set))
             {
@@ -147,7 +146,6 @@ int main(int argc, char *argv[])
                 else
                 {
                     printf("descr %d is readable\n", fd);
-                    close_conn = FALSE;
 
                     ROOT = PATH;
                     read(fd, msg, sizeof(msg));
@@ -165,39 +163,37 @@ int main(int argc, char *argv[])
                         strcpy(path,ROOT);
                         strcpy(&path[strlen(ROOT)], req_params[1]);
                         printf("FILE_PATH: %s\n", path);
-                     }
 
-                    if ((file_fd = open(path, O_RDONLY)) != -1)
-                    {
-                        server_answer.header = "HTTP/1.1 200 OK\n\n";
-                        send(client_sockfd, server_answer.header, strlen(server_answer.header), 0);
-
-                        while((bytes = read(file_fd, html, PARTBUF_SIZE)) > 0)
+                        if ((file_fd = open(path, O_RDONLY)) != -1)
                         {
-                            write(fd, html, bytes);
+                            server_answer.header = "HTTP/1.1 200 OK\n\n";
+                            send(client_sockfd, server_answer.header, strlen(server_answer.header), 0);
+
+                            while((bytes = read(file_fd, html, PARTBUF_SIZE)) > 0)
+                            {
+                                write(fd, html, bytes);
+                            }
+                            close(file_fd);
                         }
-                        close(file_fd);
-                    }
-                    else
-                    {
-                        server_answer.header = "HTTP/1.1 404 Not Found\n\n";
-                        server_answer.body = "<html><body><h1>404 Not Found</h1></body></html>";
-                        send(client_sockfd, server_answer.header, strlen(server_answer.header), 0);
-                        send(client_sockfd, server_answer.body, strlen(server_answer.body), 0);
+                        else
+                        {
+                            server_answer.header = "HTTP/1.1 404 Not Found\n\n";
+                            server_answer.body = "<html><body><h1>404 Not Found</h1></body></html>";
+                            send(fd, server_answer.header, strlen(server_answer.header), 0);
+                            send(fd, server_answer.body, strlen(server_answer.body), 0);
+                        }
+
+                        close(fd);
                     }
 
-                    if(close_conn)
-                    {
-                        close(fd);
-                        FD_CLR(fd, &master_set);
-                    }
+                    FD_CLR(fd, &master_set);
                 }
             }
         }
 
     } while (end_server == FALSE);
 
-    for(fd = 0; fd <= FD_SETSIZE; ++fd)
+    for(fd = 0; fd <= FD_SETSIZE; fd++)
     {
         if(FD_ISSET(fd, &master_set))
             close(fd);
