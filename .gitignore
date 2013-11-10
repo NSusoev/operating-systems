@@ -1,9 +1,10 @@
 *.txt
 *.o
 *.html
-fork1http
+forkserver
+preforkserver
 server
 *.png
 *.jpg
 *.pdf
-*.c.swp
+*.swp

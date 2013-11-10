@@ -32,20 +32,18 @@ struct http_procotol server_answer;
 char   msg[99999];
 char   path[99999];
 char   html[PARTBUF_SIZE];
-char   *ROOT, *req_params[2];
+char   *SERVER_ROOT, *req_params[2];
 
 int main(int argc, char *argv[])
 {
-    int    fd, file_fd, len, result, on = 1 , bytes;
+    int    fd, file_fd, max_fd, result, on = 1;
     int    server_sockfd, client_sockfd;
-    int    desc_ready, end_server = FALSE;
+    int    desc_ready;
     int    server_len, client_len;
-    int    close_conn;
-    char   buffer[80];
     struct sockaddr_in server_address;
     struct sockaddr_in client_address;
     struct timeval     timeout;
-    fd_set             master_set, working_set;
+    fd_set master_set, working_set;
 
     memset((void *)msg,(int)'\0',99999);
 
@@ -88,17 +86,19 @@ int main(int argc, char *argv[])
     listen(server_sockfd, 5);
 
     FD_ZERO(&master_set);
+    max_fd = server_sockfd;
     FD_SET(server_sockfd, &master_set);
 
     timeout.tv_sec = 3 * 60;
     timeout.tv_usec = 0;
 
-    do
+    while(TRUE)
     {
+        int bytes;
         working_set = master_set;
 
         printf("waiting on select ...\n");
-        result = select(FD_SETSIZE, &working_set, (fd_set *)0, (fd_set *)0, &timeout);
+        result = select(max_fd + 1, &working_set, (fd_set *)0, (fd_set *)0, &timeout);
         if(result < 0)
         {
             perror("select failed\n");
@@ -113,7 +113,7 @@ int main(int argc, char *argv[])
 
         desc_ready = result;
 
-        for(fd = 0; fd <= FD_SETSIZE && desc_ready > 0; fd++)
+        for(fd = 0; fd <= max_fd && desc_ready > 0; fd++)
         {
             if(FD_ISSET(fd, &working_set))
             {
@@ -133,13 +133,15 @@ int main(int argc, char *argv[])
                             if(errno != EWOULDBLOCK)
                             {
                                 perror("accept failed\n");
-                                end_server = TRUE;
+                                break;
                             }
                             break;
-                        }
+                        } 
 
                         printf("adding new client on fd %d\n", client_sockfd);
                         FD_SET(client_sockfd, &master_set);
+                        if(client_sockfd > max_fd)
+                            max_fd = client_sockfd;
 
                     } while(client_sockfd != -1);
                 }
@@ -147,7 +149,7 @@ int main(int argc, char *argv[])
                 {
                     printf("descr %d is readable\n", fd);
 
-                    ROOT = PATH;
+                    SERVER_ROOT = PATH;
                     read(fd, msg, sizeof(msg));
 
                     req_params[0] = strtok(msg, " ");
@@ -160,8 +162,8 @@ int main(int argc, char *argv[])
                             req_params[1] = "/index.html";
 
                         printf("need file: %s\n", req_params[1]);
-                        strcpy(path,ROOT);
-                        strcpy(&path[strlen(ROOT)], req_params[1]);
+                        strcpy(path,SERVER_ROOT);
+                        strcpy(&path[strlen(SERVER_ROOT)], req_params[1]);
                         printf("FILE_PATH: %s\n", path);
 
                         if ((file_fd = open(path, O_RDONLY)) != -1)
@@ -187,13 +189,16 @@ int main(int argc, char *argv[])
                     }
 
                     FD_CLR(fd, &master_set);
+                    if(fd == max_fd)
+                        while(FD_ISSET(max_fd, &master_set) == FALSE)
+                            max_fd -= 1;
                 }
             }
         }
 
-    } while (end_server == FALSE);
+    }
 
-    for(fd = 0; fd <= FD_SETSIZE; fd++)
+    for(fd = 0; fd <= max_fd; fd++)
     {
         if(FD_ISSET(fd, &master_set))
             close(fd);
