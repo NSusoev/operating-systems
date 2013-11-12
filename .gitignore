@@ -8,3 +8,4 @@ server
 *.jpg
 *.pdf
 *.swp
+*.sh

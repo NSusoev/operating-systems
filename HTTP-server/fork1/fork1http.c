@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <sys/shm.h>
 #include <string.h>
+#include <pthread.h>
 
 #define DEBUG
 #define PARTBUF_SIZE 1024
@@ -30,6 +31,7 @@ struct http_procotol
 typedef struct c_client
 {
     int curcount;
+    pthread_mutex_t count_mutex;
 } c_client;
 
 struct http_procotol server_answer;
@@ -37,8 +39,8 @@ char   msg[99999];
 char   path[99999];
 char   html[PARTBUF_SIZE];
 char   *ROOT, *req_params[2];
-void   *shared_memory = (void *)0;
 int    shmid;
+void   *shared_memory = (void *)0;
 
 void close_server(int sig);
 
@@ -46,6 +48,7 @@ int main()
 {
   int      server_sockfd, client_sockfd;
   int      server_len, client_len;
+  int      res;
   struct   sockaddr_in server_address;
   struct   sockaddr_in client_address;
   struct   sigaction act;
@@ -72,6 +75,13 @@ int main()
 
   shared_limit = (c_client *)shared_memory;
 
+  res = pthread_mutex_init(&shared_limit->count_mutex, NULL);
+  if(res != 0)
+  {
+      perror("Mutex init failed\n");
+      exit(EXIT_FAILURE);
+  }
+
   server_sockfd = socket(AF_INET,SOCK_STREAM,0);
   server_address.sin_family = AF_INET;
   server_address.sin_addr.s_addr = inet_addr("127.0.0.1");
@@ -84,10 +94,7 @@ int main()
 
   while(1)
   {
-    char *ppath , *pmsg;
     int bytes, fd;
-    ppath = path;
-    pmsg = msg;
 
     printf("server waititng \n");
     client_len = sizeof(client_address);
@@ -101,8 +108,11 @@ int main()
     else
         if (fork() == 0)
         {
+            pthread_mutex_lock(&shared_limit->count_mutex);
             shared_limit->curcount++;
             printf("clients count = %d\n", shared_limit->curcount);
+            pthread_mutex_unlock(&shared_limit->count_mutex);
+
             printf("connection is init\n");
             ROOT = PATH;
             printf("SERVER_PATH: %s\n", ROOT);
@@ -145,8 +155,11 @@ int main()
                 }
 
                 close(client_sockfd);
+                pthread_mutex_lock(&shared_limit->count_mutex);
                 shared_limit->curcount--;
                 printf("clients count = %d\n", shared_limit->curcount);
+                pthread_mutex_unlock(&shared_limit->count_mutex);
+
                 exit(EXIT_SUCCESS);
             }
         }

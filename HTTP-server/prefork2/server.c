@@ -22,19 +22,9 @@
 #define TRACE
 #endif
 
-typedef struct pool_attr
-{
-    int proc_pids[POOL_SIZE];
-    int proc_busy[POOL_SIZE];
-
-} pool_attr;
-
-
 void close_server(int sig);
 
-int       shmid;
-void      *shared_memory = (void *)0;
-pool_attr *shared_attributes;
+int proc_pids[POOL_SIZE];
 
 int main()
 {
@@ -48,22 +38,6 @@ int main()
     act.sa_handler = close_server;
     sigemptyset(&act.sa_mask);
     act.sa_flags = 0;
-
-    shmid = shmget((key_t)123,sizeof(pool_attr),0666 | IPC_CREAT);
-    if (shmid == -1)
-    {
-        fprintf(stderr,"shmget failed\n");
-        exit(EXIT_FAILURE);
-    }
-
-    shared_memory = shmat(shmid,(void *)0,0);
-    if (shared_memory == (void *)-1)
-    {
-        fprintf(stderr,"shmat failed\n");
-        exit(EXIT_FAILURE);
-    }
-
-    shared_attributes = (pool_attr *)shared_memory;
 
     server_sockfd = socket(AF_INET,SOCK_STREAM,0);
     server_address.sin_family = AF_INET;
@@ -80,12 +54,10 @@ int main()
         {
             while(1)
             {
-                shared_attributes->proc_busy[i] = 0;
                 printf("child %d waiting...\n", getpid());
                 client_len = sizeof(client_address);
                 client_sockfd = accept(server_sockfd, (struct sockaddr *)&client_address, &client_len);
 
-                shared_attributes->proc_busy[i] = 1;
                 printf("client connected to child process %d\n", getpid());
                 answer(client_sockfd);
                 close(client_sockfd);
@@ -93,7 +65,7 @@ int main()
         }
         else
         {
-            shared_attributes->proc_pids[i] = fork_result;
+            proc_pids[i] = fork_result;
         }
     }
 
@@ -104,39 +76,15 @@ int main()
 void close_server(int sig)
 {
     int i;
-    int wait_limit;
 
     printf("server closing...\n");
 
     for(i = 0; i < POOL_SIZE; i++)
     {
-        while(shared_attributes->proc_busy[i])
-        {
-            printf("waiting busy process...\n");
-            if(wait_limit == 100)
-            {
-                wait_limit = 0;
-                break;
-            }
-            wait_limit++;
-        }
-        kill(shared_attributes->proc_pids[i], SIGKILL);
+        kill(proc_pids[i], SIGKILL);
     }
 
     printf("pool is closed\n");
-
-    if(shmdt(shared_memory) == -1)
-    {
-        fprintf(stderr,"shmdt failed\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if(shmctl(shmid,IPC_RMID,0) == -1)
-    {
-        fprintf(stderr,"shmctl(IPC_RMID) failed\n");
-        exit(EXIT_FAILURE);
-    }
-
     printf("server is closed\n");
 
     exit(EXIT_SUCCESS);
