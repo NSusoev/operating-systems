@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
 		        {
 					answer(fd);
                     close(fd);
-
+                    
                     FD_CLR(fd, &master_set);
                     if(fd == max_fd)
                         while(FD_ISSET(max_fd, &master_set) == FALSE)
