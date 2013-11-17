@@ -9,11 +9,10 @@
 #include <string.h>
 #include <fcntl.h>
 #include <errno.h>
+#include "headers/answer.h"
 
-#define PARTBUF_SIZE 1024
 #define BEBUG
-#define PATH "/home/susoev/Документы/Operating-systems/HTTP-server/non-blocking-io"
-#define TRUE  1
+#define TRUE 1
 #define FALSE 0
 
 #ifdef DEBUG
@@ -21,18 +20,6 @@
 #else
 #define TRACE
 #endif
-
-typedef struct http_procotol
-{
-  char *header;
-  char *body;
-} http_procotol;
-
-struct http_procotol server_answer;
-char   msg[99999];
-char   path[99999];
-char   html[PARTBUF_SIZE];
-char   *SERVER_ROOT, *req_params[2];
 
 int main(int argc, char *argv[])
 {
@@ -44,8 +31,6 @@ int main(int argc, char *argv[])
     struct sockaddr_in client_address;
     struct timeval     timeout;
     fd_set master_set, working_set;
-
-    memset((void *)msg,(int)'\0',99999);
 
     server_sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if(server_sockfd < 0)
@@ -65,7 +50,7 @@ int main(int argc, char *argv[])
     result = ioctl(server_sockfd, FIONBIO, (char *)&on);
     if(result < 0)
     {
-        perror("ioctl failed\n");
+		perror("ioctl failed\n");
         close(server_sockfd);
         exit(EXIT_FAILURE);
     }
@@ -143,50 +128,12 @@ int main(int argc, char *argv[])
                         if(client_sockfd > max_fd)
                             max_fd = client_sockfd;
 
-                    } while(client_sockfd != -1);
-                }
-                else
-                {
-                    printf("descr %d is readable\n", fd);
-
-                    SERVER_ROOT = PATH;
-                    read(fd, msg, sizeof(msg));
-
-                    req_params[0] = strtok(msg, " ");
-                    if (strncmp(req_params[0], "GET", 4) == 0)
-                    {
-                        printf("this is GET query\n");
-                        req_params[1] = strtok(NULL," ");
-
-                        if (strncmp(req_params[1],"/", 2) == 0)
-                            req_params[1] = "/index.html";
-
-                        printf("need file: %s\n", req_params[1]);
-                        strcpy(path,SERVER_ROOT);
-                        strcpy(&path[strlen(SERVER_ROOT)], req_params[1]);
-                        printf("FILE_PATH: %s\n", path);
-
-                        if ((file_fd = open(path, O_RDONLY)) != -1)
-                        {
-                            server_answer.header = "HTTP/1.1 200 OK\n\n";
-                            send(client_sockfd, server_answer.header, strlen(server_answer.header), 0);
-
-                            while((bytes = read(file_fd, html, PARTBUF_SIZE)) > 0)
-                            {
-                                write(fd, html, bytes);
-                            }
-                            close(file_fd);
-                        }
-                        else
-                        {
-                            server_answer.header = "HTTP/1.1 404 Not Found\n\n";
-                            server_answer.body = "<html><body><h1>404 Not Found</h1></body></html>";
-                            send(fd, server_answer.header, strlen(server_answer.header), 0);
-                            send(fd, server_answer.body, strlen(server_answer.body), 0);
-                        }
-
-                        close(fd);
-                    }
+		            } while(client_sockfd != -1);
+		        }
+		        else
+		        {
+					answer(fd);
+                    close(fd);
 
                     FD_CLR(fd, &master_set);
                     if(fd == max_fd)
@@ -195,7 +142,6 @@ int main(int argc, char *argv[])
                 }
             }
         }
-
     }
 
     for(fd = 0; fd <= max_fd; fd++)

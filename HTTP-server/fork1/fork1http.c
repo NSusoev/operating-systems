@@ -14,7 +14,6 @@
 #define DEBUG
 #define PARTBUF_SIZE 1024
 #define CLIENT_LIMIT 10
-#define PATH "/home/susoev/Документы/Operating-systems/HTTP-server/fork1"
 
 #ifdef DEBUG
 #define TRACE printf("%s %d\n", __FILE__, __LINE__);
@@ -114,8 +113,6 @@ int main()
             pthread_mutex_unlock(&shared_limit->count_mutex);
 
             printf("connection is init\n");
-            ROOT = PATH;
-            printf("SERVER_PATH: %s\n", ROOT);
 
             memset((void *)msg,(int)'\0',99999);
             read(client_sockfd, msg, sizeof(msg));
@@ -130,12 +127,10 @@ int main()
                 if (strncmp(req_params[1],"/", 2) == 0)
                     req_params[1] = "/index.html";
 
-                printf("need file: %s\n", req_params[1]);
-                strcpy(path,ROOT);
-                strcpy(&path[strlen(ROOT)], req_params[1]);
-                printf("FILE_PATH: %s\n", path);
+               if (strstr(req_params[1], "..") != NULL)
+                    req_params[1] = "/index.html";
 
-                if ((fd = open(path, O_RDONLY)) != -1)
+                if ((fd = open(req_params[1] + 1, O_RDONLY)) != -1)
                 {
                     server_answer.header = "HTTP/1.1 200 OK\n\n";
                     send(client_sockfd, server_answer.header, strlen(server_answer.header), 0);
