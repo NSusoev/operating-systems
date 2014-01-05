@@ -37,7 +37,7 @@ extern void delete_inode(inode_t *delnode)
 {
 	int i = 0;
 
-	for(i; i < delnode->parent->childs_c; i++)
+	for(; i < delnode->parent->childs_c; i++)
 	{	
 		if(strcmp(delnode->parent->childs[i].name, delnode->name) == 0)
 			break;
@@ -93,7 +93,7 @@ extern char **split(char *path)
 		result[0] = "/";
 		result[1] = strtok(path, "/");
 
-		for(i; i < nesting_level; i++)
+		for(; i < nesting_level; i++)
 		{
 			result[i] = strtok(NULL, "/");
 		}
@@ -108,7 +108,7 @@ extern char **split(char *path)
 	return result;
 }
 
-extern inode_t *search_inode(inode_t *root, char *path)
+extern inode_t *search_inode(inode_t *root,char *path)
 {
 	char **splited = split(path);
 	int parts_count = 0;

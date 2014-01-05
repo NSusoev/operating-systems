@@ -18,8 +18,8 @@
 #include <fcntl.h>
 #include "fsoperations.h"
 
-static const char *hello_str = "Hello World!\n";
-static const char *hello_path = "/hello";
+//static const char *hello_str = "Hello World!\n";
+//static const char *hello_path = "/hello";
 
 static inode_t *root;
 
@@ -27,8 +27,8 @@ static int fs_getattr(const char *path, struct stat *stbuf)
 {
 	memset(stbuf, 0, sizeof(struct stat));
 	inode_t *node = search_inode(root, path);
-	
-    if (node == 0) return -ENOENT;  
+
+    if (node == NULL) return -ENOENT;  
 
     if (node->content == 0)
     {
@@ -48,16 +48,16 @@ static int fs_getattr(const char *path, struct stat *stbuf)
 static int fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			 off_t offset, struct fuse_file_info *fi)
 {
-	(void) offset;
-	(void) fi;
+	int i = 0;
 
-	if (strcmp(path, "/") != 0)
-		return -ENOENT;
+	inode_t *node = search_inode(root, path);
+	if(node == NULL) return -ENOENT;
 
-	filler(buf, ".", NULL, 0);
-	filler(buf, "..", NULL, 0);
-	filler(buf, hello_path + 1, NULL, 0);
-
+	for(;i < node->childs_c; i++)
+	{
+		filler(buf, node->childs[i].name, NULL, 0);
+	}
+	
 	return 0;
 }
 
@@ -76,15 +76,16 @@ static int fs_read(const char *path, char *buf, size_t size, off_t offset,
 		      struct fuse_file_info *fi)
 {
 	size_t len;
-	(void) fi;
-	if(strcmp(path, hello_path) != 0)
+	
+	inode_t *node = search_inode(root, path);
+	if(node == NULL)
 		return -ENOENT;
 
-	len = strlen(hello_str);
+	len = strlen(node->content);
 	if (offset < len) {
 		if (offset + size > len)
 			size = len - offset;
-		memcpy(buf, hello_str + offset, size);
+		memcpy(buf, node->content + offset, size);
 	} else
 		size = 0;
 
@@ -117,6 +118,8 @@ static struct fuse_operations fs_oper = {
 int main(int argc, char *argv[])
 {
 	root = init();
+	inode_t *newnode = create_new_inode("hello","12312");
+	add_inode(root, newnode);
 	log_action("FILE SYSTEM WAS CREATED\n");
 
 	return fuse_main(argc, argv, &fs_oper, NULL);
