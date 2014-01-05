@@ -3,7 +3,7 @@
 #include <string.h>
 #include "fsoperations.h"
 
-inode_t *init()
+extern inode_t *init()
 {
 	inode_t *root = (inode_t *)malloc(sizeof(inode_t));
 	root->name = "/";
@@ -14,7 +14,7 @@ inode_t *init()
 	return root;
 }
 
-inode_t *create_new_node(char *name, char *content);
+extern inode_t *create_new_inode(char *name, char *content)
 {
 	inode_t *newnode = (inode_t *)malloc(sizeof(inode_t));
 	newnode->name = name;
@@ -25,21 +25,38 @@ inode_t *create_new_node(char *name, char *content);
 	return newnode;
 }
 
-void add_inode(inode_t *parent, inode_t *newnode)
+extern void add_inode(inode_t *parent, inode_t *newnode)
 {
 	newnode->parent = parent;
 	parent->childs_c++;
-	parent->childs = (inode_t *)realloc(parent->childs, sizeof(inode_t) * parent->childs);
-	parent->childs[childs_c - 1] = newnode;
+	parent->childs = (inode_t *)realloc(parent->childs, sizeof(inode_t) * parent->childs_c);
+	parent->childs[parent->childs_c - 1] = *newnode;
 }
 
-void delete_inode(inode_t *delnode)
+extern void delete_inode(inode_t *delnode)
 {
-	delnode->parent->childs_c--;
-	delnode->parent->childs = (inode_t *)realloc(parent->childs, sizeof(inode_t) * parent->childs_c);
-}
+	int i = 0;
 
-void log_action(char *action)
+	for(i; i < delnode->parent->childs_c; i++)
+	{	
+		if(strcmp(delnode->parent->childs[i].name, delnode->name) == 0)
+			break;
+	}
+
+	delnode->parent->childs_c--;
+
+	if (i < delnode->parent->childs_c - 1)
+	{
+		delnode->parent->childs[i] = delnode->parent->childs[delnode->parent->childs_c];
+		delnode->parent->childs = (inode_t *)realloc(delnode->parent->childs, sizeof(inode_t) * delnode->parent->childs_c);
+    }
+    else
+    {
+    	delnode->parent->childs = (inode_t *)realloc(delnode->parent->childs, sizeof(inode_t) * delnode->parent->childs_c);
+    }
+} 
+
+extern void log_action(char *action)
 {
 	FILE *file;
 	file = fopen("log.txt", "a+");
@@ -53,7 +70,7 @@ void log_action(char *action)
 	fclose(file);
 }
 
-char **split(char *path)
+extern char **split(char *path)
 {
 	char *ppath = path;
 	int  nesting_level = 1;
@@ -91,15 +108,15 @@ char **split(char *path)
 	return result;
 }
 
-inode_t *search_inode(inode_t *root, char *name)
+extern inode_t *search_inode(inode_t *root, char *path)
 {
 	char **splited = split(path);
 	int parts_count = 0;
 	int i = 0;
 
-	while(splited[i++] != 0) count++;
+	while(splited[i++] != 0) parts_count++;
 
-	if(count == 1) return root;
+	if(parts_count == 1) return root;
 
 	inode_t *curnode = root;
 	i = 1;
@@ -109,16 +126,16 @@ inode_t *search_inode(inode_t *root, char *name)
 		int j = 0;
 		for(; j < curnode->childs_c; j++)
 		{
-			if(strcmp(curnode->childs[j], splited[i]) == 0)
+			if(strcmp(curnode->childs[j].name, splited[i]) == 0)
 			{
-				curnode = curnode->childs[j];
+				curnode = &curnode->childs[j];
 				break;
 			}
 		}
 		i++;
 	}		
 
-	if(strcmp(curnode->name, splited[count - 1]) != 0)
+	if(strcmp(curnode->name, splited[parts_count - 1]) != 0)
 		return NULL;
 
 	return curnode;
