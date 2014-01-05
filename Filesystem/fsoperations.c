@@ -118,5 +118,8 @@ inode_t *search_inode(inode_t *root, char *name)
 		i++;
 	}		
 
+	if(strcmp(curnode->name, splited[count - 1]) != 0)
+		return NULL;
+
 	return curnode;
 } 
