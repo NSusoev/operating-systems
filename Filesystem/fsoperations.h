@@ -9,12 +9,19 @@
 #define TRACE
 #endif
 
-inode_t *init();
-inode_t *search_inode(inode_t *root,char *path);
-inode_t *create_new_inode(char *name, char *content);
-void add_inode(inode_t *parent, inode_t *newnode);
+void log_action(char* action);
+inode_t *init_file_system();
+void add_inode(inode_t *parent, inode_t *node);
+inode_t *create_inode(char* name, char* content);
 void delete_inode(inode_t *node);
-void log_action(char *action);
-char **split(char *path);
+char** split_path(char* path);
+inode_t *search_inode(inode_t *root,char *path, int mode);
 
 #endif
+
+
+
+
+
+
+

@@ -3,37 +3,51 @@
 #include <string.h>
 #include "fsoperations.h"
 
-extern inode_t *init()
+void log_action(char* action)
 {
-	inode_t *root = (inode_t *)malloc(sizeof(inode_t));
-	root->name = "/";
-	root->content = 0;
-	root->parent = NULL;
-	root->childs = NULL;
-	root->childs_c = 0;
-	return root;
+	FILE *file;
+	file = fopen("log.txt", "a+");
+	if(file == 0)
+	{
+		perror("log.txt");
+		exit(EXIT_FAILURE);
+	}
+
+	fprintf(file, "%s\n", action);
+	fclose(file);
 }
 
-extern inode_t *create_new_inode(char *name, char *content)
+inode_t *init_file_system()
 {
-	inode_t *newnode = (inode_t *)malloc(sizeof(inode_t));
-	newnode->name = name;
-	newnode->content = content;
-	newnode->parent = NULL;
-	newnode->childs = NULL;
-	newnode->childs_c = 0;
-	return newnode;
+	inode_t *tree = (inode_t *)malloc(sizeof(inode_t));
+	tree->name = "/";
+	tree->content = NULL;
+	tree->parent = NULL;
+	tree->childs = NULL;
+	tree->childs_c = 0;
+	return tree;
 }
 
-extern void add_inode(inode_t *parent, inode_t *newnode)
-{
+void add_inode(inode_t *parent, inode_t *newnode)
+{	
 	newnode->parent = parent;
 	parent->childs_c++;
 	parent->childs = (inode_t *)realloc(parent->childs, sizeof(inode_t) * parent->childs_c);
 	parent->childs[parent->childs_c - 1] = *newnode;
 }
 
-extern void delete_inode(inode_t *delnode)
+inode_t *create_inode(char* name, char* content)
+{
+	inode_t *node = (inode_t *)malloc(sizeof(inode_t));
+	node->name = name;
+	node->content = content;
+	node->parent = NULL;
+	node->childs = NULL;
+	node->childs_c = 0;
+	return node;
+}
+
+void delete_inode(inode_t *delnode)
 {
 	int i = 0;
 
@@ -54,63 +68,104 @@ extern void delete_inode(inode_t *delnode)
     {
     	delnode->parent->childs = (inode_t *)realloc(delnode->parent->childs, sizeof(inode_t) * delnode->parent->childs_c);
     }
-} 
-
-extern void log_action(char *action)
-{
-	FILE *file;
-	file = fopen("log.txt", "a+");
-	if(file == 0)
-	{
-		perror("log.txt");
-		exit(EXIT_FAILURE);
-	}
-
-	fprintf(file, "%s\n", action);
-	fclose(file);
 }
 
-extern char **split(char *path)
+char** split_path(char* path)
 {
-	char *ppath = path;
-	int  nesting_level = 1;
-	int  i = 2;
+	char** array;	
+	if (strlen(path) > 1)
+	{	
+		int count = 0;	
+		int i = 0;	
+		while(path[i] != 0)
+		{
+			if (path[i] == '/') count++;
+			i++;
+		}
+		array = (char**)malloc(sizeof(char*)*(count + 2));
+		array[count + 1] = 0;
+		array[0] = "/";
+
+		int n = 1;
+		i = 1;
+		while(path[i] != 0)
+		{
+			int c = 1;			
+			int j = i;			
+			while((path[j] != '/') && (path[j] != 0))
+			{
+				c++;j++;i++;
+			}
+			if (path[i] != 0) i++;
+			array[n] = (char *)malloc(sizeof(char)*c);
+			array[n][c - 1] = 0;
+			n++;	
+		}
+
+		n = 1;
+		i = 1;
+		while(path[i] != 0)
+		{			
+			int j = i;
+			int tmp = i;			
+			while((path[j] != '/') && (path[j] != 0))
+			{
+				array[n][j - tmp] = path[j];
+				j++;i++;
+			}
+			if (path[i] != 0) i++;
+			n++;	
+		}
+	} 
+    else
+	{
+		array = (char**)malloc(sizeof(char*)*2);
+		array[1] = 0;
+		array[0] = "/";
+	}
+	return array;
+
+/*	int  nesting_level = 1;
+	int  i = 0;
 	char **result;
+    char *copy_path_for_parse;
 
 	if(strlen(path) > 1)
 	{
-		while(*ppath != 0)
+		while(path[i] != 0)
 		{	
-			if(*ppath == '/')
+			if(path[i] != '/')
 			{
 				nesting_level++;
 			}
-			ppath++;
+			i++;
 		}
 
-		result = (char **)malloc(sizeof(char) * nesting_level);
-		path++;
+		result = (char **)malloc(sizeof(char *) * nesting_level + 2);
+        copy_path_for_parse = strdup(path);
+        copy_path_for_parse++;
 		result[0] = "/";
-		result[1] = strtok(path, "/");
+        result[nesting_level + 1] = 0;
+		result[1] = strtok(copy_path_for_parse, "/");
 
-		for(; i < nesting_level; i++)
+		for(i = 2; i < nesting_level + 1; i++)
 		{
 			result[i] = strtok(NULL, "/");
 		}
 	}
 	else
 	{
-		result = (char**)malloc(sizeof(char) * 2); 
+		result = (char**)malloc(sizeof(char *) * 2); 
         result[1] = 0;
         result[0] = "/";
 	}
 
-	return result;
+	return result;*/
 }
 
-extern inode_t *search_inode(inode_t *root,char *path)
+inode_t *search_inode(inode_t *root,char *path, int mode)
 {
-	char **splited = split(path);
+	char **splited = split_path(path);
 	int parts_count = 0;
 	int i = 0;
 
@@ -121,7 +176,7 @@ extern inode_t *search_inode(inode_t *root,char *path)
 	inode_t *curnode = root;
 	i = 1;
 
-	while(splited[i++] != 0)
+	while(splited[i] != 0)
 	{
 		int j = 0;
 		for(; j < curnode->childs_c; j++)
@@ -132,11 +187,19 @@ extern inode_t *search_inode(inode_t *root,char *path)
 				break;
 			}
 		}
-		i++;
+        i++;
 	}		
 
-	if(strcmp(curnode->name, splited[parts_count - 1]) != 0)
-		return NULL;
+    if(mode == 0)
+    {
+        if(strcmp(curnode->name, splited[parts_count - 1]) != 0)
+            return NULL;
+    }
+    else
+    {
+        if(strcmp(curnode->name, splited[parts_count - 2]) != 0)
+            return NULL;
+    }
 
 	return curnode;
 } 
