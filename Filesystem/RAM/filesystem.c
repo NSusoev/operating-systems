@@ -78,12 +78,12 @@ static int my_write(const char *path, const char *buf, size_t size, off_t offset
 	//return strlen(buf+offset);
     
 	inode_t *node = search_inode(tree, path, 0);
-	int len = strlen(node->content);
-	if (offset < len)
+	int max_len = 256;
+	if (offset < max_len) 
 	{
-		if (offset + size > len) size = len - offset;
+		if (offset + size > max_len) size = max_len - offset;
 		memcpy(node->content + offset, buf, size);
-	} else	size = 0;
+	} else	size = max_len;
 	return size;
 }
 
@@ -96,7 +96,7 @@ static int my_mkdir(const char* path, mode_t mode)
 	inode_t *node = create_inode(array[ct - 1], 0);
 	inode_t *parent = search_inode(tree, path, 1);
 	add_inode(parent, node);
-	fprintf(file, "%s\n", "NEW FOLDER WAS CREATED\n");
+	fprintf(file, "%s\n", "NEW FOLDER WAS CREATED");
     fclose(file);
 	return 0;		
 }
@@ -110,6 +110,7 @@ static int my_mknod(const char* path, mode_t mode, dev_t dev)
 	inode_t *node = create_inode(array[ct - 1], "");
 	inode_t *parent = search_inode(tree, path, 1);
 	add_inode(parent, node);
+	fprintf(file, "%s\n", "NEW NODE WAS CREATED");
 
 	return 0;
 }
@@ -136,6 +137,7 @@ static int my_rmdir(char* path)
 {
 	inode_t *node = search_inode(tree, path, 0);
 	delete_inode(node);
+	fprintf(file, "%s\n", "DIRECTORY WAS DELETED");
 	return 0;
 }
 
@@ -143,6 +145,7 @@ static int my_unlink(char* path)
 {
 	inode_t *node = search_inode(tree, path, 0);
 	delete_inode(node);
+	fprintf(file, "%s\n", "FILE WAS DELETED");
 	return 0;
 }
 
@@ -172,6 +175,6 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	fprintf(file, "%s\n", "FILE SYSTEM WAS CREATED\n");
+	fprintf(file, "%s\n", "\nFILE SYSTEM WAS CREATED");
 	return fuse_main(argc, argv, &my_oper, NULL);
 }
