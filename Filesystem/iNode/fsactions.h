@@ -1,6 +1,7 @@
 #ifndef FSACTIONS
 #define FSACTIONS
 
+//упаковка структур по одному байту
 #pragma pack(1)
 
 //#define DEBUG
