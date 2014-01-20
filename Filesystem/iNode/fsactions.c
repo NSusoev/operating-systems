@@ -1,4 +1,3 @@
-#include "defuse.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -6,13 +5,18 @@
 #include <errno.h>
 #include "fsactions.h"
 
+const int size_of_block = SIZE_OF_BLOCK;
+int filesystem_fd = -1;
+const int number_of_root_block = NUMBER_OF_ROOT_BLOCK;
+
 int init()
 {
     int result = 0;
-
+    // пытаемся открыть существующий файл с файловой системой
     filesystem_fd = open(FILESYSTEM, O_RDWR, 0666);
     if (filesystem_fd < 0)
     {
+        // создаем новый
         filesystem_fd = open(FILESYSTEM, O_CREAT | O_RDWR, 0666);
         if (filesystem_fd < 0 || create_root() != 0)
         {
@@ -21,6 +25,7 @@ int init()
     }
     return result;
 }
+
 
 int create_root()
 {
@@ -41,15 +46,18 @@ int create_root()
     return result;
 }
 
+
 void *create_block()
 {
     return calloc(size_of_block, sizeof(char));
 }
 
+
 void destroy_block(void *block)
 {
     free(block);
 }
+
 
 int read_block(int number, void *block)
 {
@@ -64,6 +72,7 @@ int read_block(int number, void *block)
     return result;
 }
 
+
 int write_block(int number, void *block)
 {
     int result = -1;
@@ -77,27 +86,25 @@ int write_block(int number, void *block)
     return result;
 }
 
+
 int seek_free_block()
 {
     int number = number_of_root_block + 1;
     char status;
     int read_result;
-
-    while(TRUE)
+    while (TRUE)
     {
-        if (lseek(filesystem_fd, size_of_block * number, SEEK_SET) < 0)
+        if (lseek(filesystem_fd,  size_of_block * number, SEEK_SET) < 0)
         {
-            number = 1;
+            number = -1;
             break;
         }
-
         read_result = read(filesystem_fd, &status, sizeof(char));
         if (read_result < 0)
         {
             number = -1;
             break;
         }
-
         if (read_result == 0 || status == BLOCK_STATUS_FREE)
         {
             break;
@@ -106,6 +113,7 @@ int seek_free_block()
     }
     return number;
 }
+
 
 void *get_block(int number)
 {
@@ -116,11 +124,12 @@ void *get_block(int number)
         if (block != NULL && read_block(number, block) != 0)
         {
             destroy_block(block);
-            block = NULL; 
+            block = NULL;
         }
     }
     return block;
 }
+
 
 int set_block_status(int number, char status)
 {
@@ -135,12 +144,12 @@ int set_block_status(int number, char status)
     return result;
 }
 
+
 int remove_block(int number)
 {
     int result = 0;
     int status = get_block_status(number);
-
-    switch(status)
+    switch (status)
     {
         case BLOCK_STATUS_FREE:
             break;
@@ -150,12 +159,64 @@ int remove_block(int number)
         case BLOCK_STATUS_FILE:
             remove_file(number);
             break;
-        defaut:
+        default:
             result = -1;
             break;
     }
     return result;
 }
+
+
+int seek_node(int node_number, char **node_names)
+{
+    int result = -1;
+    if (node_number >= 0 && node_names != NULL)
+    {
+        if (*node_names == NULL)
+        {
+            result = node_number;
+        }
+        else
+        {
+            int next_node_number = seek_node_in_folder(node_number, *node_names);
+            if (next_node_number > 0)
+            {
+                result = seek_node(next_node_number, node_names + 1);
+            }
+        }
+    }
+    return result;
+}
+
+
+int remove_file(int number)
+{
+    return set_block_status(number, BLOCK_STATUS_FREE);
+}
+
+
+int remove_folder(int number)
+{
+    int result = -1;
+    node_t *folder = (node_t *)get_block(number);
+    if (folder != NULL)
+    {
+        int *start = (int *)folder->content;
+        int *end = (int *)((void *)folder + size_of_block);
+        while (start < end)
+        {
+            if (*start > 0)
+            {
+                 remove_block(*start);
+            }
+            start++;
+        }
+        destroy_block(folder);
+        result = set_block_status(number, BLOCK_STATUS_FREE);
+    }
+    return result;
+}
+
 
 int create_folder(const char *name, mode_t mode)
 {
@@ -184,6 +245,7 @@ int create_folder(const char *name, mode_t mode)
     return number;
 }
 
+
 int create_file(const char *name, mode_t mode, dev_t dev)
 {
     int number = seek_free_block();
@@ -211,6 +273,7 @@ int create_file(const char *name, mode_t mode, dev_t dev)
     }
     return number;
 }
+
 
 char **create_node_names(const char *path)
 {
@@ -252,6 +315,7 @@ char **create_node_names(const char *path)
     return result;
 }
 
+
 int get_block_status(int number)
 {
     int result = -1;
@@ -275,6 +339,7 @@ int get_block_status(int number)
     return result;
 }
 
+
 int get_node_name(int number, char *buf)
 {
     int result = -1;
@@ -287,6 +352,7 @@ int get_node_name(int number, char *buf)
     }
     return result;
 }
+
 
 int get_node_stat(int number, stat_t *stbuf)
 {
@@ -301,6 +367,7 @@ int get_node_stat(int number, stat_t *stbuf)
     return result;
 }
 
+
 int set_node_name(int number, char *buf)
 {
     int result = -1;
@@ -314,6 +381,7 @@ int set_node_name(int number, char *buf)
     return result;
 }
 
+
 int set_node_stat(int number, stat_t *buf)
 {
     int result = -1;
@@ -326,6 +394,7 @@ int set_node_stat(int number, stat_t *buf)
     }
     return result;
 }
+
 
 char *create_name(const char *name)
 {
@@ -342,6 +411,7 @@ char *create_name(const char *name)
     return result;
 }
 
+
 char *create_empty_name()
 {
     return (char *)calloc(NODE_NAME_MAX_SIZE, sizeof(char));
@@ -352,6 +422,7 @@ void destroy_name(char *name)
 {
     free(name);
 }
+
 
 char *exclude_last_node_name(char **node_names)
 {
@@ -368,6 +439,7 @@ char *exclude_last_node_name(char **node_names)
     return result;
 }
 
+
 void destroy_node_names(char **node_names)
 {
     if (node_names != NULL)
@@ -381,6 +453,7 @@ void destroy_node_names(char **node_names)
         free(node_names);
     }
 }
+
 
 int clear_block(int number)
 {
@@ -399,6 +472,7 @@ int clear_block(int number)
     }
     return result;
 }
+
 
 int add_node_to_folder(int folder_number, int node_number)
 {
@@ -431,6 +505,7 @@ int add_node_to_folder(int folder_number, int node_number)
     }
     return result;
 }
+
 
 int remove_node_from_folder(int folder_number, int node_number)
 {
@@ -465,8 +540,8 @@ int remove_node_from_folder(int folder_number, int node_number)
             destroy_block(folder);
         }
     }
-    return result;
-}
+    return result;}
+
 
 int seek_node_in_folder(int folder_number, const char *node_name)
 {

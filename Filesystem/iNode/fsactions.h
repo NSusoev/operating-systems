@@ -1,6 +1,9 @@
 #ifndef FSACTIONS
 #define FSACTIONS
 
+#define _FILE_OFFSET_BITS 64
+#define FUSE_USE_VERSION 26
+#include <fuse.h>
 //упаковка структур по одному байту
 #pragma pack(1)
 
@@ -55,14 +58,6 @@ struct node
     stat_t stat;
     char content[0];
 };
-
-// search
-// искать первый свободный блок
-int seek_free_block();
-// найти узел
-int seek_node(int node_number, char **node_names);
-// поиск узла в папке
-int seek_node_in_folder(int folder_number, const char *node_name);
 
 //create
 // загрузить данные из файла в ОЗУ и инициализировать глобальные переменные
@@ -133,9 +128,17 @@ int set_node_stat(int number, stat_t *buf);
 // добавить узел в папку
 int add_node_to_folder(int folder_number, int node_number);
 
-const int size_of_block = SIZE_OF_BLOCK;
-int filesystem_fd = -1;
-const int number_of_root_block = NUMBER_OF_ROOT_BLOCK;
+// search
+// искать первый свободный блок
+int seek_free_block();
+// найти узел
+int seek_node(int node_number, char **node_names);
+// поиск узла в папке
+int seek_node_in_folder(int folder_number, const char *node_name);
+
+extern const int size_of_block;
+extern int filesystem_fd;
+extern const int number_of_root_block;
 
 #endif
 
