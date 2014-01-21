@@ -30,7 +30,7 @@ int init()
 int create_root()
 {
     int result = -1;
-    node_t *root = (node_t *)create_block();
+    inode_t *root = (inode_t *)create_block();
     if (root != NULL)
     {
         root->status = BLOCK_STATUS_FOLDER;
@@ -87,7 +87,7 @@ int write_block(int number, void *block)
 }
 
 
-int seek_free_block()
+int search_free_block()
 {
     int number = number_of_root_block + 1;
     char status;
@@ -167,7 +167,7 @@ int remove_block(int number)
 }
 
 
-int seek_node(int node_number, char **node_names)
+int search_inode(int node_number, char **node_names)
 {
     int result = -1;
     if (node_number >= 0 && node_names != NULL)
@@ -178,10 +178,10 @@ int seek_node(int node_number, char **node_names)
         }
         else
         {
-            int next_node_number = seek_node_in_folder(node_number, *node_names);
+            int next_node_number = search_inode_in_folder(node_number, *node_names);
             if (next_node_number > 0)
             {
-                result = seek_node(next_node_number, node_names + 1);
+                result = search_inode(next_node_number, node_names + 1);
             }
         }
     }
@@ -198,7 +198,7 @@ int remove_file(int number)
 int remove_folder(int number)
 {
     int result = -1;
-    node_t *folder = (node_t *)get_block(number);
+    inode_t *folder = (inode_t *)get_block(number);
     if (folder != NULL)
     {
         int *start = (int *)folder->content;
@@ -220,10 +220,10 @@ int remove_folder(int number)
 
 int create_folder(const char *name, mode_t mode)
 {
-    int number = seek_free_block();
+    int number = search_free_block();
     if (number >= 0)
     {
-        node_t *folder = (node_t *)create_block();
+        inode_t *folder = (inode_t *)create_block();
         if (folder != NULL)
         {
             int name_size = strlen(name) + 1;
@@ -248,10 +248,10 @@ int create_folder(const char *name, mode_t mode)
 
 int create_file(const char *name, mode_t mode, dev_t dev)
 {
-    int number = seek_free_block();
+    int number = search_free_block();
     if (number >= 0)
     {
-        node_t *file = (node_t *)create_block();
+        inode_t *file = (inode_t *)create_block();
         if (file != NULL)
         {
             int name_size = strlen(name) + 1;
@@ -275,7 +275,7 @@ int create_file(const char *name, mode_t mode, dev_t dev)
 }
 
 
-char **create_node_names(const char *path)
+char **split_path(const char *path)
 {
     char **result = NULL;
     int path_size = strlen(path) + 1;
@@ -340,7 +340,7 @@ int get_block_status(int number)
 }
 
 
-int get_node_name(int number, char *buf)
+int get_inode_name(int number, char *buf)
 {
     int result = -1;
     if (number >= 0 && lseek(filesystem_fd, size_of_block * number + NODE_NAME_OFFSET, SEEK_SET) >= 0)
@@ -354,7 +354,7 @@ int get_node_name(int number, char *buf)
 }
 
 
-int get_node_stat(int number, stat_t *stbuf)
+int get_inode_stat(int number, stat_t *stbuf)
 {
     int result = -1;
     if (number >= 0 && lseek(filesystem_fd, size_of_block * number + NODE_STAT_OFFSET, SEEK_SET) >= 0)
@@ -368,7 +368,7 @@ int get_node_stat(int number, stat_t *stbuf)
 }
 
 
-int set_node_name(int number, char *buf)
+int set_inode_name(int number, char *buf)
 {
     int result = -1;
     if (number >= 0 && lseek(filesystem_fd, size_of_block * number + NODE_NAME_OFFSET, SEEK_SET) >= 0)
@@ -382,7 +382,7 @@ int set_node_name(int number, char *buf)
 }
 
 
-int set_node_stat(int number, stat_t *buf)
+int set_inode_stat(int number, stat_t *buf)
 {
     int result = -1;
     if (number >= 0 && lseek(filesystem_fd, size_of_block * number + NODE_STAT_OFFSET, SEEK_SET) >= 0)
@@ -474,12 +474,12 @@ int clear_block(int number)
 }
 
 
-int add_node_to_folder(int folder_number, int node_number)
+int add_inode_to_folder(int folder_number, int node_number)
 {
     int result = -1;
     if (folder_number >= 0 && node_number > 0)
     {
-        node_t *folder = (node_t *)get_block(folder_number);
+        inode_t *folder = (inode_t *)get_block(folder_number);
         if (folder != NULL)
         {
             if (folder->status == BLOCK_STATUS_FOLDER)
@@ -512,7 +512,7 @@ int remove_node_from_folder(int folder_number, int node_number)
     int result = -1;
     if (folder_number >= 0 && node_number > 0)
     {
-        node_t *folder = (node_t *)get_block(folder_number);
+        inode_t *folder = (inode_t *)get_block(folder_number);
         if (folder != NULL)
         {
             if (folder->status == BLOCK_STATUS_FOLDER)
@@ -543,12 +543,12 @@ int remove_node_from_folder(int folder_number, int node_number)
     return result;}
 
 
-int seek_node_in_folder(int folder_number, const char *node_name)
+int search_inode_in_folder(int folder_number, const char *node_name)
 {
     int result = -1;
     if (folder_number >= 0 && node_name != NULL)
     {
-        node_t *folder = (node_t *)get_block(folder_number);
+        inode_t *folder = (inode_t *)get_block(folder_number);
         if (folder != NULL)
         {
             if (folder->status == BLOCK_STATUS_FOLDER)
@@ -558,7 +558,7 @@ int seek_node_in_folder(int folder_number, const char *node_name)
                 int *end = (int *)((void *)folder + size_of_block);
                 while (start < end)
                 {
-                    if (*start > 0 && get_node_name(*start, name) == 0 && strcmp(node_name, name) == 0)
+                    if (*start > 0 && get_inode_name(*start, name) == 0 && strcmp(node_name, name) == 0)
                     {
                         result = *start;
                         break;

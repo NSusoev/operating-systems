@@ -31,11 +31,11 @@ int my_truncate(const char *path, off_t size);
 int my_getattr(const char *path, struct stat *stbuf)
 {
     int result = -ENOENT;
-    char **node_names = create_node_names(path);
+    char **node_names = split_path(path);
     if (node_names != NULL)
     {
-        int number = seek_node(number_of_root_block, node_names);
-        if (number >= 0 && get_node_stat(number, stbuf) == 0)
+        int number = search_inode(number_of_root_block, node_names);
+        if (number >= 0 && get_inode_stat(number, stbuf) == 0)
         {
             result = 0;
         }
@@ -48,13 +48,13 @@ int my_getattr(const char *path, struct stat *stbuf)
 int my_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
     int result = -ENOENT;
-    char **node_names = create_node_names(path);
+    char **node_names = split_path(path);
     if (node_names != NULL)
     {
-        int number = seek_node(number_of_root_block, node_names);
+        int number = search_inode(number_of_root_block, node_names);
         if (number >= 0)
         {
-            node_t *folder = (node_t *)get_block(number);
+            inode_t *folder = (inode_t *)get_block(number);
             if (folder != NULL)
             {
                 if (folder->status == BLOCK_STATUS_FOLDER)
@@ -68,7 +68,7 @@ int my_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset
                     int *end = (int *)((void *)folder + size_of_block);
                     while (start < end)
                     {
-                        if (*start > 0 && get_node_name(*start, name) == 0 && get_node_stat(*start, &stat) == 0)
+                        if (*start > 0 && get_inode_name(*start, name) == 0 && get_inode_stat(*start, &stat) == 0)
                         {
                             if (filler(buf, name, &stat, 0) != 0)
                             {
@@ -96,13 +96,13 @@ int my_open(const char *path, struct fuse_file_info *fi)
 int my_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     int result = -ENOENT;
-    char **node_names = create_node_names(path);
+    char **node_names = split_path(path);
     if (node_names != NULL)
     {
-        int number = seek_node(number_of_root_block, node_names);
+        int number = search_inode(number_of_root_block, node_names);
         if (number >= 0)
         {
-            node_t *file = (node_t *)get_block(number);
+            inode_t *file = (inode_t *)get_block(number);
             if (file != NULL)
             {
                 if (file->status == BLOCK_STATUS_FILE)
@@ -133,13 +133,13 @@ int my_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_
 int my_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     int result = -ENOENT;
-    char **node_names = create_node_names(path);
+    char **node_names = split_path(path);
     if (node_names != NULL)
     {
-        int number = seek_node(number_of_root_block, node_names);
+        int number = search_inode(number_of_root_block, node_names);
         if (number >= 0)
         {
-            node_t *file = (node_t *)get_block(number);
+            inode_t *file = (inode_t *)get_block(number);
             if (file != NULL)
             {
                 if (file->status == BLOCK_STATUS_FILE)
@@ -177,17 +177,17 @@ int my_write(const char *path, const char *buf, size_t size, off_t offset, struc
 int my_mkdir(const char *path, mode_t mode)
 {
     int result = -ENOENT;
-    char **node_names = create_node_names(path);
+    char **node_names = split_path(path);
     if (node_names != NULL)
     {
         char *name = exclude_last_node_name(node_names);
         if (name != NULL)
         {
-            int folder_number = seek_node(number_of_root_block, node_names);
+            int folder_number = search_inode(number_of_root_block, node_names);
             if (folder_number >= 0)
             {
                 int new_folder = create_folder(name, mode);
-                if (new_folder >= 0 && add_node_to_folder(folder_number, new_folder) == 0)
+                if (new_folder >= 0 && add_inode_to_folder(folder_number, new_folder) == 0)
                 {
                     result = 0;
                 }
@@ -203,17 +203,17 @@ int my_mkdir(const char *path, mode_t mode)
 int my_mknod(const char *path, mode_t mode, dev_t dev)
 {
     int result = -ENOENT;
-    char **node_names = create_node_names(path);
+    char **node_names = split_path(path);
     if (node_names != NULL)
     {
         char *name = exclude_last_node_name(node_names);
         if (name != NULL)
         {
-            int folder_number = seek_node(number_of_root_block, node_names);
+            int folder_number = search_inode(number_of_root_block, node_names);
             if (folder_number >= 0)
             {
                 int new_file = create_file(name, mode, dev);
-                if (new_file >= 0 && add_node_to_folder(folder_number, new_file) == 0)
+                if (new_file >= 0 && add_inode_to_folder(folder_number, new_file) == 0)
                 {
                     result = 0;
                 }
@@ -229,10 +229,10 @@ int my_mknod(const char *path, mode_t mode, dev_t dev)
 int my_rename(const char *old_path, const char *new_path)
 {
     int result = -ENOENT;
-    char **old_node_names = create_node_names(old_path);
+    char **old_node_names = split_path(old_path);
     if (old_node_names != NULL)
     {
-        char **new_node_names = create_node_names(new_path);
+        char **new_node_names = split_path(new_path);
         if (new_node_names != NULL)
         {
             char *old_name = exclude_last_node_name(old_node_names);
@@ -241,12 +241,12 @@ int my_rename(const char *old_path, const char *new_path)
                 char *new_name = exclude_last_node_name(new_node_names);
                 if (new_name != NULL)
                 {
-                    int old_folder_number = seek_node(number_of_root_block, old_node_names);
-                    int new_folder_number = seek_node(number_of_root_block, new_node_names);
-                    int node_number = seek_node_in_folder(old_folder_number, old_name);
+                    int old_folder_number = search_inode(number_of_root_block, old_node_names);
+                    int new_folder_number = search_inode(number_of_root_block, new_node_names);
+                    int node_number = search_inode_in_folder(old_folder_number, old_name);
                     remove_node_from_folder(old_folder_number, node_number);
-                    add_node_to_folder(new_folder_number, node_number);
-                    set_node_name(node_number, new_name);
+                    add_inode_to_folder(new_folder_number, node_number);
+                    set_inode_name(node_number, new_name);
                     result = 0;
                     destroy_name(new_name);
                 }
@@ -263,16 +263,16 @@ int my_rename(const char *old_path, const char *new_path)
 int my_rmdir(const char *path)
 {
     int result = -ENOENT;
-    char **node_names = create_node_names(path);
+    char **node_names = split_path(path);
     if (node_names != NULL)
     {
         char *name = exclude_last_node_name(node_names);
         if (name != NULL)
         {
-            int folder_number = seek_node(number_of_root_block, node_names);
+            int folder_number = search_inode(number_of_root_block, node_names);
             if (folder_number >= 0)
             {
-                int node_number = seek_node_in_folder(folder_number, name);
+                int node_number = search_inode_in_folder(folder_number, name);
                 if (node_number >= 0)
                 {
                     if (remove_node_from_folder(folder_number, node_number) == 0 && remove_block(node_number) == 0)
@@ -292,16 +292,16 @@ int my_rmdir(const char *path)
 int my_unlink(const char *path)
 {
     int result = -ENOENT;
-    char **node_names = create_node_names(path);
+    char **node_names = split_path(path);
     if (node_names != NULL)
     {
         char *name = exclude_last_node_name(node_names);
         if (name != NULL)
         {
-            int folder_number = seek_node(number_of_root_block, node_names);
+            int folder_number = search_inode(number_of_root_block, node_names);
             if (folder_number >= 0)
             {
-                int node_number = seek_node_in_folder(folder_number, name);
+                int node_number = search_inode_in_folder(folder_number, name);
                 if (node_number >= 0)
                 {
                     if (remove_node_from_folder(folder_number, node_number) == 0 && remove_block(node_number) == 0)
@@ -321,50 +321,24 @@ int my_unlink(const char *path)
 int my_truncate(const char *path, off_t size)
 {
     int result = -ENOENT;
-    char **node_names = create_node_names(path);
+    char **node_names = split_path(path);
     if (node_names != NULL)
     {
-        int number = seek_node(number_of_root_block, node_names);
+        int number = search_inode(number_of_root_block, node_names);
         if (number >= 0)
         {
             stat_t stat;
-            if (get_node_stat(number, &stat) == 0)
+            if (get_inode_stat(number, &stat) == 0)
             {
                 if (size <= NODE_CONTENT_MAX_SIZE)
                 {
                     stat.st_size = size;
-                    if (set_node_stat(number, &stat) == 0)
+                    if (set_inode_stat(number, &stat) == 0)
                     {
                         result = 0;
                     }
                 }
             }
-//            node_t *node = (node_t *)get_block(number);
-//            if (node != NULL)
-//            {
-//                if (size <= NODE_CONTENT_MAX_SIZE)
-//                {
-//                    off_t min;
-//                    off_t max;
-//                    if (node->stat.st_size < size)
-//                    {
-//                        min = node->stat.st_size;
-//                        max = size;
-//                    }
-//                    else
-//                    {
-//                        min = size;
-//                        max = node->stat.st_size;
-//                    }
-//                    memset(node->content + min, 0, max - min);
-//                    node->stat.st_size = size;
-//                    if (write_block(number, node) == 0)
-//                    {
-//                        result = 0;
-//                    }
-//                }
-//                destroy_block(node);
-//            }
         }
         destroy_node_names(node_names);
     }
@@ -397,20 +371,3 @@ int main(int argc, char *argv[])
     }
     return fuse_main(argc, argv, &my_oper, NULL);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

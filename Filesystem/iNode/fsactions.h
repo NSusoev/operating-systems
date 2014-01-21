@@ -30,13 +30,7 @@
 // информация о файле
 typedef struct stat stat_t;
 // файл или папка
-typedef struct node node_t;
-// список блоков
-typedef struct list list_t;
-// блок с данными
-typedef struct data data_t;
-// логический тип
-typedef char bool;
+typedef struct node inode_t;
 
 enum boolean
 {
@@ -76,7 +70,7 @@ char *create_name(const char *name);
 char *create_empty_name();
 
 // parse group
-char **create_node_names(const char *path);
+char **split_path(const char *path);
 // исключить имя последнего узла
 char *exclude_last_node_name(char **node_names);
 
@@ -112,29 +106,29 @@ void *get_block(int number);
 // получить состояние блока
 int get_block_status(int number);
 // получить имя узла
-int get_node_name(int number, char *buf);
+int get_inode_name(int number, char *buf);
 // получить атрибуты узла
-int get_node_stat(int number, stat_t *stbuf);
+int get_inode_stat(int number, stat_t *stbuf);
 
 //set group
 // задать состояние блока
 int set_block_status(int number, char status);
 // задать имя узла
-int set_node_name(int number, char *buf);
+int set_inode_name(int number, char *buf);
 // задать атрибуты узла
-int set_node_stat(int number, stat_t *buf);
+int set_inode_stat(int number, stat_t *buf);
 
 //add group
 // добавить узел в папку
-int add_node_to_folder(int folder_number, int node_number);
+int add_inode_to_folder(int folder_number, int node_number);
 
 // search
 // искать первый свободный блок
-int seek_free_block();
+int search_free_block();
 // найти узел
-int seek_node(int node_number, char **node_names);
+int search_inode(int node_number, char **node_names);
 // поиск узла в папке
-int seek_node_in_folder(int folder_number, const char *node_name);
+int search_inode_in_folder(int folder_number, const char *node_name);
 
 extern const int size_of_block;
 extern int filesystem_fd;
