@@ -78,7 +78,7 @@ static int my_write(const char *path, const char *buf, size_t size, off_t offset
 	//return strlen(buf+offset);
     
 	inode_t *node = search_inode(tree, path, 0);
-	int max_len = 256;
+	int max_len = 255;
 	if (offset < max_len) 
 	{
 		if (offset + size > max_len) size = max_len - offset;
@@ -97,7 +97,6 @@ static int my_mkdir(const char* path, mode_t mode)
 	inode_t *parent = search_inode(tree, path, 1);
 	add_inode(parent, node);
 	fprintf(file, "%s\n", "NEW FOLDER WAS CREATED");
-    fclose(file);
 	return 0;		
 }
 
