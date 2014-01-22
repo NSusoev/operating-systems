@@ -153,7 +153,7 @@ int set_fat_item_status(unsigned int number, status_block_t newstatus)
 
 int set_fat_item_first_block(unsigned int number, unsigned int new_first_block)
 {
-    if (lseek(filesystem_fd, sizeof(fat_block_t) * number + FAT_STATUS_OFFSET, SEEK_SET) >= 0)
+    if (lseek(filesystem_fd, sizeof(fat_block_t) * number + FAT_FIRST_BLOCK_NUMBER_OFFSET, SEEK_SET) >= 0)
     {
             if (write(filesystem_fd, &new_first_block, sizeof(int)) == sizeof(int))
                 return 0;
