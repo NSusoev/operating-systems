@@ -15,7 +15,7 @@ typedef enum status_block {
 typedef struct fat_block {
 
     char name[FAT_NAME_MAX_SIZE];
-    block_status_t status;
+    status_block_t status;
     int first_block_number;
 
 } fat_block_t;
@@ -23,7 +23,7 @@ typedef struct fat_block {
 typedef struct data_block {
 
     int next_block_number;
-    stat_t stat;
+    stat_t stats;
     void *data;
 
 } data_block_t;

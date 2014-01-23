@@ -1,8 +1,3 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <string.h>
-#include <fcntl.h>
 #include "fsactions.h"
 
 int filesystem_fd = -1;
@@ -15,7 +10,7 @@ int init_file_system()
         filesystem_fd = open(FS_FILE_NAME, O_CREAT | O_RDWR, 0666);
         if (filesystem_fd >= 0)
         {
-            if (create_root_catalog() != 0)
+            if (create_fat() != 0)
             {
                 perror("CREATE FAT OPERATION WAS FAILED");
                 return -1;
@@ -32,19 +27,18 @@ int create_fat()
     for(i = 0; i < BLOCK_COUNT; i++)
     {
         fat_block_t *fat_item = (fat_block_t *)malloc(sizeof(fat_block_t));
+        memset(fat_item->name, '\0', 256);
             
         switch(i)
         {
             case 0:
                 {
                     fat_item->name[0] = '/';
-                    fat_item->name[1] = NULL;
                     fat_item->status = BLOCK_FOLDER;
                     break;
                 }
             default:
                 {
-                    fat_item->name[0] = NULL;
                     fat_item->status = BLOCK_FREE;
                     break;
                 }
@@ -85,10 +79,11 @@ int search_free_block()
 {
     int i;
     int free_block_number = -1;
+    fat_block_t *fat_item;
 
     for(i = 0; i < BLOCK_COUNT; i++)
     {
-        fat_block_t *fat_item = (fat_block_t *)malloc(sizeof(fat_block_t));
+        fat_item = (fat_block_t *)malloc(sizeof(fat_block_t));
         if (read_fat_item(fat_item, i) != 0)
         {
             perror("READ FAT ITEM OPERATION FAILED");
@@ -108,7 +103,7 @@ int search_free_block()
 int search_fat_item_of_block(unsigned int block_number)
 {
     int i;
-    int block_number = -1;
+    int result_block_number = -1;
 
     fat_block_t *fat_item = (fat_block_t *)malloc(sizeof(fat_block_t));
     for(i = 0; i < BLOCK_COUNT; i++)
@@ -122,13 +117,13 @@ int search_fat_item_of_block(unsigned int block_number)
         {
             if (fat_item->first_block_number == block_number)
             {
-                block_number = i;
+                result_block_number = i;
                 break;
             }
         }
     }
     free(fat_item);
-    return block_number;
+    return result_block_number;
 }
 
 int set_fat_item_name(unsigned int number, char *name)
@@ -145,7 +140,7 @@ int set_fat_item_status(unsigned int number, status_block_t newstatus)
 {
     if (lseek(filesystem_fd, sizeof(fat_block_t) * number + FAT_STATUS_OFFSET, SEEK_SET) >= 0)
     {
-            if (write(filesystem_fd, &newstat, sizeof(status_block_t)) == sizeof(status_block_t))
+            if (write(filesystem_fd, &newstatus, sizeof(status_block_t)) == sizeof(status_block_t))
                 return 0;
     }
     return -1;

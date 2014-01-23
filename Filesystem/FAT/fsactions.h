@@ -1,6 +1,15 @@
 #ifndef FSACTIONS_H
 #define FSACTIONS_H
+
+#define _FILE_OFFSET_BITS 64
+#define FUSE_USE_VERSION 26
+#include <fuse.h>
+
 #include "struct.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
 
 #define FS_FILE_NAME "filesystem"
 #define BLOCK_SIZE 4096
