@@ -10,9 +10,9 @@ int init_file_system()
         filesystem_fd = open(FS_FILE_NAME, O_CREAT | O_RDWR, 0666);
         if (filesystem_fd >= 0)
         {
-            if (create_fat() != 0)
+            if (create_fat() != 0 || create_data_blocks() != 0)
             {
-                perror("CREATE FAT OPERATION WAS FAILED");
+                perror("CREATE NEW FILE SYSTEM OPERATION WAS FAILED");
                 return -1;
             }
         }
@@ -126,7 +126,7 @@ int search_fat_item_of_block(unsigned int block_number)
     return result_block_number;
 }
 
-int set_fat_item_name(unsigned int number, char *name)
+int set_fat_item_name(char *name, unsigned int number)
 {
     if (lseek(filesystem_fd, sizeof(fat_block_t) * number + FAT_NAME_OFFSET, SEEK_SET) >= 0)
     {
@@ -136,7 +136,7 @@ int set_fat_item_name(unsigned int number, char *name)
     return -1;
 }
 
-int set_fat_item_status(unsigned int number, status_block_t newstatus)
+int set_fat_item_status(status_block_t newstatus, unsigned int number)
 {
     if (lseek(filesystem_fd, sizeof(fat_block_t) * number + FAT_STATUS_OFFSET, SEEK_SET) >= 0)
     {
@@ -146,7 +146,7 @@ int set_fat_item_status(unsigned int number, status_block_t newstatus)
     return -1;
 }
 
-int set_fat_item_first_block(unsigned int number, unsigned int new_first_block)
+int set_fat_item_first_block(unsigned int new_first_block, unsigned int number)
 {
     if (lseek(filesystem_fd, sizeof(fat_block_t) * number + FAT_FIRST_BLOCK_NUMBER_OFFSET, SEEK_SET) >= 0)
     {
@@ -155,5 +155,94 @@ int set_fat_item_first_block(unsigned int number, unsigned int new_first_block)
     }
     return -1;
 }
+
+int create_data_blocks()
+{
+    int i;
+    data_block_t *block;
+    int result = 0;
+
+    if (lseek(filesystem_fd, TO_START_DATA_BLOCK_OFFSET, SEEK_SET) >= 0)
+    {
+        for(i = 1; i < BLOCK_COUNT; i++)
+        {
+            block = (data_block_t *)malloc(sizeof(BLOCK_SIZE));
+            block->next_block_number = 0; 
+            memset(block->data, '\0', BLOCK_DATA_PART_SIZE); 
+            if (write_block(block, i) != 0)
+            {
+                perror("WRITE BLOCK OPERATION FAILED");
+                result = -1;
+                break;
+            }
+            free(block);
+        }
+    }
+
+    free(block);
+    return result;
+}
+
+int write_block(data_block_t *block, unsigned int number)
+{
+    if (lseek(filesystem_fd, TO_START_DATA_BLOCK_OFFSET + sizeof(BLOCK_SIZE) * number, SEEK_SET) >= 0)
+    {
+        if (write(filesystem_fd, block, sizeof(BLOCK_SIZE)) == sizeof(BLOCK_SIZE))
+        {
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int read_block(data_block_t *block, unsigned int number)
+{
+    if (lseek(filesystem_fd, TO_START_DATA_BLOCK_OFFSET + sizeof(BLOCK_SIZE) * number, SEEK_SET) >= 0)
+    {
+        if (read(filesystem_fd, block, sizeof(BLOCK_SIZE)) == sizeof(BLOCK_SIZE))
+        {
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int set_block_next_number(unsigned int new_next_number, unsigned int number)
+{
+    if (lseek(filesystem_fd, TO_START_DATA_BLOCK_OFFSET + sizeof(BLOCK_SIZE) * number + BLOCK_NEXT_NUMBER_OFFSET, SEEK_SET) >= 0)
+    {
+        if (read(filesystem_fd, new_next_number, sizeof(int)) == sizeof(int))
+        {
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int set_block_stats(stat_t newstats, unsigned int number)
+{
+    if (lseek(filesystem_fd, TO_START_DATA_BLOCK_OFFSET + sizeof(BLOCK_SIZE) * number + BLOCK_STAT_OFFSET, SEEK_SET) >= 0)
+    {
+        if (read(filesystem_fd, new_next_number, sizeof(stat_t)) == sizeof(stat_t))
+        {
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int set_block_data(int *data, unsigned int number)
+{
+    if (lseek(filesystem_fd, TO_START_DATA_BLOCK_OFFSET + sizeof(BLOCK_SIZE) * number + BLOCK_DATA_OFFSET, SEEK_SET) >= 0)
+    {
+        if (read(filesystem_fd, data, sizeof(BLOCK_DATA_PART_SIZE)) == sizeof(BLOCK_DATA_PART_SIZE))
+        {
+            return 0;
+        }
+    }
+    return -1;
+}
+
+
 
 

@@ -16,15 +16,15 @@ typedef struct fat_block {
 
     char name[FAT_NAME_MAX_SIZE];
     status_block_t status;
-    int first_block_number;
+    unsigned int first_block_number;
 
 } fat_block_t;
 
 typedef struct data_block {
 
-    int next_block_number;
+    unsigned int next_block_number;
     stat_t stats;
-    void *data;
+    unsigned int data[BLOCK_DATA_PART_SIZE];
 
 } data_block_t;
 

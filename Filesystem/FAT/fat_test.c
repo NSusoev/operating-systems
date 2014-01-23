@@ -33,9 +33,9 @@ int main()
     printf("%d\n", fat_item->status);
     printf("%d\n", fat_item->first_block_number);
 
-    set_fat_item_name(5, "somefile");
-    set_fat_item_status(5, BLOCK_FILE);
-    set_fat_item_first_block(5, 20);
+    set_fat_item_name("somefile", 5);
+    set_fat_item_status(BLOCK_FILE, 5);
+    set_fat_item_first_block(20,5);
 
     if (read_fat_item(fat_item, 5) != 0)
     {
