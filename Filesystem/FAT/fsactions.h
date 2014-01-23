@@ -30,9 +30,9 @@ int write_fat_item(fat_block_t *fat_item, unsigned int number);
 int read_fat_item(fat_block_t *fat_item, unsigned int number);
 int search_free_block();
 int search_fat_item_of_block(unsigned int block_number);
-int set_fat_item_first_block(unsigned int new_first_block, unsigned int number)
-int set_fat_item_status(status_block_t newstatus, unsigned int number)
-int set_fat_item_name(char *name, unsigned int number)
+int set_fat_item_first_block(unsigned int new_first_block, unsigned int number);
+int set_fat_item_status(status_block_t newstatus, unsigned int number);
+int set_fat_item_name(char *name, unsigned int number);
 int write_block(data_block_t *block, unsigned int number);
 int read_block(data_block_t *block, unsigned int number);
 int create_data_blocks();
