@@ -5,40 +5,49 @@
 #define FUSE_USE_VERSION 26
 #include <fuse.h>
 
-#define FS_FILE_NAME "filesystem"
-#define BLOCK_SIZE 4096
-#define BLOCK_COUNT 256
-#define BLOCK_NEXT_NUMBER_OFFSET 0
-#define BLOCK_STAT_OFFSET (BLOCK_NEXT_NUMBER_OFFSET + sizeof(int))
-#define BLOCK_DATA_OFFSET (BLOCK_STAT_OFFSET + sizeof(stat_t))
-#define BLOCK_DATA_PART_SIZE (BLOCK_SIZE - ((sizeof(int) + sizeof(stat_t))))
-
-#define FAT_NAME_OFFSET 0
-#define FAT_STATUS_OFFSET (sizeof(char) * FAT_NAME_MAX_SIZE)
-#define FAT_FIRST_BLOCK_NUMBER_OFFSET (FAT_STATUS_OFFSET + sizeof(status_block_t))
-#define TO_START_DATA_BLOCK_OFFSET (sizeof(fat_block_t) * BLOCK_COUNT)
-
-#include "struct.h"
 #include <stdlib.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <string.h>
+#include <unistd.h>
+#include "struct.h"
+
+#define FS_FILE_NAME "filesystem"
+#define BLOCK_COUNT 256
+#define BLOCK_SIZE 4096
+#define BLOCK_NAME_OFFSET 0
+#define BLOCK_STATUS_OFFSET (BLOCK_NAME_OFFSET + (sizeof(char) * BLOCK_NAME_MAX_SIZE))
+#define BLOCK_STATS_OFFSET (BLOCK_STATUS_OFFSET + sizeof(status_block_t))
+#define BLOCK_DATA_OFFSET (BLOCK_STATS_OFFSET + sizeof(stat_t))
+#define BLOCK_NAME_SIZE sizeof(char) * BLOCK_NAME_MAX_SIZE
+#define BLOCK_DATA_PART_SIZE (BLOCK_SIZE - ((sizeof(char) * BLOCK_NAME_MAX_SIZE + sizeof(status_block_t) + sizeof(stat_t))))
+
+#define TO_START_DATA_BLOCK_OFFSET (sizeof(fat_block_t) * BLOCK_COUNT)
 
 int init_file_system();
+
 int create_fat();
-int write_fat_item(fat_block_t *fat_item, unsigned int number);
-int read_fat_item(fat_block_t *fat_item, unsigned int number);
+
+int write_fat_item(fat_block_t *fat_item, size_t number);
+
+int read_fat_item(fat_block_t *fat_item, size_t number);
+
 int search_free_block();
-int search_fat_item_of_block(unsigned int block_number);
-int set_fat_item_first_block(unsigned int new_first_block, unsigned int number);
-int set_fat_item_status(status_block_t newstatus, unsigned int number);
-int set_fat_item_name(char *name, unsigned int number);
-int write_block(data_block_t *block, unsigned int number);
-int read_block(data_block_t *block, unsigned int number);
+
+int search_fat_item_of_block(size_t block_number);
+
+int write_block(data_block_t *block, size_t number);
+
+int read_block(data_block_t *block, size_t number);
+
 int create_data_blocks();
-int set_block_next_number(unsigned int new_next_number, unsigned int number);
-int set_block_stats(stat_t newstats, unsigned int number);
-int set_block_data(unsigned int *data, unsigned int number);
+
+int set_block_status(status_block_t newstatus, size_t number);
+
+int set_block_name(char *name, size_t number);
+
+int set_block_stats(stat_t *newstats, size_t number);
+
+int set_block_data(size_t *data, size_t number);
 
 extern int filesystem_fd;
 
