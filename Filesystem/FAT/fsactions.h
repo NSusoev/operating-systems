@@ -1,6 +1,14 @@
 #ifndef FSACTIONS_H
 #define FSACTIONS_H
 
+#define BEBUG
+
+#ifdef BEBUG 
+#define TRACE printf("[BEBUG] FILE:%s LINE:%d\n", __FILE__, __LINE__);
+#else
+#define TRACE
+#endif
+
 #define _FILE_OFFSET_BITS 64
 #define FUSE_USE_VERSION 26
 #include <fuse.h>
@@ -12,14 +20,11 @@
 #include "struct.h"
 
 #define FS_FILE_NAME "filesystem"
-#define BLOCK_COUNT 256
-#define BLOCK_SIZE 4096
 #define BLOCK_NAME_OFFSET 0
 #define BLOCK_STATUS_OFFSET (BLOCK_NAME_OFFSET + (sizeof(char) * BLOCK_NAME_MAX_SIZE))
 #define BLOCK_STATS_OFFSET (BLOCK_STATUS_OFFSET + sizeof(status_block_t))
 #define BLOCK_DATA_OFFSET (BLOCK_STATS_OFFSET + sizeof(stat_t))
 #define BLOCK_NAME_SIZE sizeof(char) * BLOCK_NAME_MAX_SIZE
-#define BLOCK_DATA_PART_SIZE (BLOCK_SIZE - ((sizeof(char) * BLOCK_NAME_MAX_SIZE + sizeof(status_block_t) + sizeof(stat_t))))
 
 #define TO_START_DATA_BLOCK_OFFSET (sizeof(fat_block_t) * BLOCK_COUNT)
 

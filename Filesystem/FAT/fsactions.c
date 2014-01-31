@@ -10,6 +10,7 @@ int init_file_system()
         filesystem_fd = open(FS_FILE_NAME, O_CREAT | O_RDWR, 0666);
         if (filesystem_fd >= 0)
         {
+            TRACE
             if (create_fat() != 0 || create_data_blocks() != 0)
             {
                 perror("CREATE NEW FILE SYSTEM OPERATION WAS FAILED");
@@ -23,11 +24,12 @@ int init_file_system()
 int create_fat()
 {
     int i;
+    fat_block_t *fat_item = (fat_block_t *)malloc(sizeof(fat_block_t));
+    int result = 0;
+    memset(fat_item->blocks, 0, sizeof(size_t) * BLOCK_COUNT);    
 
     for(i = 0; i < BLOCK_COUNT; i++)
     {
-        fat_block_t *fat_item = (fat_block_t *)malloc(sizeof(fat_block_t));
-        memset(fat_item->blocks, 0, sizeof(int) * BLOCK_COUNT);    
         switch(i)
         {
             case 0:
@@ -45,11 +47,13 @@ int create_fat()
         if (write_fat_item(fat_item, i) < 0)
         {
             perror("FAT ITEM WRITE OPERATION WAS FAILED");
-            return -1;
+            result = -1;
+            break;
         }
-        free(fat_item);
     }
-    return 0;
+    TRACE
+    free(fat_item);
+    return result;
 }
 
 int write_fat_item(fat_block_t *fat_item, size_t number)
@@ -137,40 +141,39 @@ int search_fat_item_of_block(size_t block_number)
 int create_data_blocks()
 {
     int i;
-    data_block_t *block;
     int result = 0;
-    block = (data_block_t *)malloc(sizeof(BLOCK_SIZE));
+    data_block_t *block = (data_block_t *)malloc(sizeof(data_block_t));
 
-    if (lseek(filesystem_fd, TO_START_DATA_BLOCK_OFFSET, SEEK_SET) >= 0)
+    memset(block->name, '\0', sizeof(BLOCK_NAME_SIZE));
+    memset(block->data, '\0', sizeof(BLOCK_DATA_PART_SIZE));
+
+    TRACE
+    for(i = 0; i < BLOCK_COUNT; i++)
     {
-        for(i = 0; i < BLOCK_COUNT; i++)
+        if (i == 0)
+            block->status = BLOCK_FOLDER;
+        else
+            block->status = BLOCK_FREE;
+
+        if (write_block(block, i) != 0)
         {
-            memset(block->name, '\0', sizeof(block->name)); 
-            memset(block->data, 0, sizeof(block->data));
-
-            if (i == 0)
-                block->status = BLOCK_FOLDER;
-            else
-                block->status = BLOCK_FREE;
-
-            if (write_block(block, i) != 0)
-            {
-                perror("WRITE BLOCK OPERATION FAILED");
-                result = -1;
-                break;
-            }
+            perror("WRITE BLOCK OPERATION FAILED");
+            result = -1;
+            break;
         }
     }
+    TRACE
 
     free(block);
+    TRACE
     return result;
 }
 
 int write_block(data_block_t *block, size_t number)
 {
-    if (lseek(filesystem_fd, TO_START_DATA_BLOCK_OFFSET + sizeof(BLOCK_SIZE) * number, SEEK_SET) >= 0)
+    if (lseek(filesystem_fd, TO_START_DATA_BLOCK_OFFSET + sizeof(data_block_t) * number, SEEK_SET) >= 0)
     {
-        if (write(filesystem_fd, block, sizeof(BLOCK_SIZE)) == sizeof(BLOCK_SIZE))
+        if (write(filesystem_fd, block, sizeof(data_block_t)) == sizeof(data_block_t))
         {
             return 0;
         }
@@ -180,9 +183,9 @@ int write_block(data_block_t *block, size_t number)
 
 int read_block(data_block_t *block, size_t number)
 {
-    if (lseek(filesystem_fd, TO_START_DATA_BLOCK_OFFSET + sizeof(BLOCK_SIZE) * number, SEEK_SET) >= 0)
+    if (lseek(filesystem_fd, TO_START_DATA_BLOCK_OFFSET + sizeof(data_block_t) * number, SEEK_SET) >= 0)
     {
-        if (read(filesystem_fd, block, sizeof(BLOCK_SIZE)) == sizeof(BLOCK_SIZE))
+        if (read(filesystem_fd, block, sizeof(data_block_t)) == sizeof(data_block_t))
         {
             return 0;
         }
