@@ -58,9 +58,9 @@ int create_fat()
 
 int write_fat_item(fat_block_t *fat_item, size_t number)
 {
-    if (lseek(filesystem_fd, sizeof(fat_block_t) * number, SEEK_SET) >= 0)
+    if (lseek(filesystem_fd, sizeof(data_block_t) * number, SEEK_SET) >= 0)
     {
-        if (write(filesystem_fd, fat_item, sizeof(fat_block_t)) == sizeof(fat_block_t))
+        if (write(filesystem_fd, fat_item, sizeof(data_block_t)) == sizeof(data_block_t))
             return 0;
     }
     return -1;
@@ -68,9 +68,9 @@ int write_fat_item(fat_block_t *fat_item, size_t number)
 
 int read_fat_item(fat_block_t *fat_item, size_t number)
 {
-    if (lseek(filesystem_fd, sizeof(fat_block_t) * number, SEEK_SET) >= 0)
+    if (lseek(filesystem_fd, sizeof(data_block_t) * number, SEEK_SET) >= 0)
     {
-        if (read(filesystem_fd, fat_item, sizeof(fat_block_t)) == sizeof(fat_block_t))
+        if (read(filesystem_fd, fat_item, sizeof(data_block_t)) == sizeof(data_block_t))
             return 0;
     }
     return -1;
@@ -195,7 +195,7 @@ int read_block(data_block_t *block, size_t number)
 
 int set_block_name(char *name, size_t number)
 {
-    if (lseek(filesystem_fd, TO_START_DATA_BLOCK_OFFSET + sizeof(fat_block_t) * number + BLOCK_NAME_OFFSET, SEEK_SET) >= 0)
+    if (lseek(filesystem_fd, TO_START_DATA_BLOCK_OFFSET + sizeof(data_block_t) * number + BLOCK_NAME_OFFSET, SEEK_SET) >= 0)
     {
             if (write(filesystem_fd, name, BLOCK_NAME_SIZE) == BLOCK_NAME_SIZE)
                 return 0;
@@ -205,7 +205,7 @@ int set_block_name(char *name, size_t number)
 
 int set_block_status(status_block_t newstatus, size_t number)
 {
-    if (lseek(filesystem_fd,TO_START_DATA_BLOCK_OFFSET + sizeof(fat_block_t) * number + BLOCK_STATUS_OFFSET, SEEK_SET) >= 0)
+    if (lseek(filesystem_fd,TO_START_DATA_BLOCK_OFFSET + sizeof(data_block_t) * number + BLOCK_STATUS_OFFSET, SEEK_SET) >= 0)
     {
             if (write(filesystem_fd, &newstatus, sizeof(status_block_t)) == sizeof(status_block_t))
                 return 0;
@@ -215,7 +215,7 @@ int set_block_status(status_block_t newstatus, size_t number)
 
 int set_block_stats(stat_t *newstats, size_t number)
 {
-    if (lseek(filesystem_fd, TO_START_DATA_BLOCK_OFFSET + sizeof(BLOCK_SIZE) * number + BLOCK_STATS_OFFSET, SEEK_SET) >= 0)
+    if (lseek(filesystem_fd, TO_START_DATA_BLOCK_OFFSET + sizeof(data_block_t) * number + BLOCK_STATS_OFFSET, SEEK_SET) >= 0)
     {
         if (read(filesystem_fd, newstats, sizeof(stat_t)) == sizeof(stat_t))
         {
@@ -225,9 +225,9 @@ int set_block_stats(stat_t *newstats, size_t number)
     return -1;
 }
 
-int set_block_data(size_t *data, size_t number)
+int set_block_data(char *data, size_t number)
 {
-    if (lseek(filesystem_fd, TO_START_DATA_BLOCK_OFFSET + sizeof(BLOCK_SIZE) * number + BLOCK_DATA_OFFSET, SEEK_SET) >= 0)
+    if (lseek(filesystem_fd, TO_START_DATA_BLOCK_OFFSET + sizeof(data_block_t) * number + BLOCK_DATA_OFFSET, SEEK_SET) >= 0)
     {
         if (read(filesystem_fd, data, sizeof(BLOCK_DATA_PART_SIZE)) == sizeof(BLOCK_DATA_PART_SIZE))
         {

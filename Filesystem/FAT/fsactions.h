@@ -13,6 +13,8 @@
 #define FUSE_USE_VERSION 26
 #include <fuse.h>
 
+#pragma pack(1)
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -52,7 +54,7 @@ int set_block_name(char *name, size_t number);
 
 int set_block_stats(stat_t *newstats, size_t number);
 
-int set_block_data(size_t *data, size_t number);
+int set_block_data(char *data, size_t number);
 
 extern int filesystem_fd;
 
